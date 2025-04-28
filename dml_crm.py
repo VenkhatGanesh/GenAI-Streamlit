@@ -374,7 +374,7 @@ with col2:
             st.session_state.is_first_message = False
             
             # Rerun to display the new messages
-            st.experimental_rerun()
+            st.rerun()
     
     # Footer
     st.markdown("""
