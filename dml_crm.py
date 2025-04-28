@@ -301,7 +301,7 @@ col1, col2, col3 = st.columns([1, 3, 1])
 with col2:
     # Header
     st.markdown('<div class="header">', unsafe_allow_html=True)
-    st.title("⚡ Schneider Electric Salesforce Assistant")
+    st.title("⚡ crm Salesforce Assistant")
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Introduction
@@ -385,7 +385,7 @@ with col2:
 
 # Sidebar with additional information
 with st.sidebar:
-    st.image("https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/tiger.svg", width=200)
+    st.image("https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/tiger.svg", width=20)
     st.markdown("<h3 style='color:white;'>Help & Information</h3>", unsafe_allow_html=True)
     
     with st.expander("📚 What can I ask?"):
