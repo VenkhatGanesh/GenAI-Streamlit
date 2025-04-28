@@ -7,13 +7,12 @@ import base64
 
 # Set page configuration
 st.set_page_config(
-    page_title="Schneider Electric Assistant",
+    page_title="CRM Assistant",
     page_icon="⚡",
     layout="wide"
 )
 
-# Define Schneider Electric brand colors
-PRIMARY_COLOR = "#3DCD58"  # Schneider Green
+PRIMARY_COLOR = "#3DCD58" 
 SECONDARY_COLOR = "#2C2E35"  # Dark Gray
 ACCENT_COLOR = "#009530"  # Darker Green
 BG_COLOR = "#E8F5E9"  # Light Green Background
@@ -198,10 +197,10 @@ def add_bg_from_base64(base64_string):
         unsafe_allow_html=True
     )
 
-# Schneider Electric logo as base64 (faded)
+
 # This is a placeholder, you'll need to replace with the actual logo encoded in base64
 def get_base64_logo():
-    # This is a placeholder for the Schneider Electric logo
+    # This is a placeholder for the 
     # Replace this with the actual base64 encoded logo
     return "iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYAAAB5fY51AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAFNSURBVHgB7dRBDQAhEAAwpYCF/TfBwkeQkE2YU7B5M7Nzjgh4zNYFQIWwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCADAvIsIAMC8iwgAwLyLCAvr9uA4anF1D/AAAAAElFTkSuQmCC"
 
@@ -309,7 +308,7 @@ with col2:
     if st.session_state.is_first_message:
         st.markdown("""
         <div class="bot-message">
-            <b>Welcome to the Schneider Electric Salesforce Assistant!</b><br>
+            <b>Welcome to the Salesforce Assistant!</b><br>
             I can help you query Salesforce data using natural language. Try asking me something like:
             <ul>
                 <li>Show me recent leads</li>
@@ -379,14 +378,14 @@ with col2:
     # Footer
     st.markdown("""
     <div class="footer">
-        © 2025 Schneider Electric. All rights reserved.<br>
-        Powered by Schneider Electric AI Services.
+        © 2025. All rights reserved.<br>
+        Powered by AI Solutions.
     </div>
     """, unsafe_allow_html=True)
 
 # Sidebar with additional information
 with st.sidebar:
-    st.image("https://www.se.com/ww/en/assets/564/media/60926/SE_logo_Life-Is-On_White_RGB.svg", width=200)
+    st.image("https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/tiger.svg", width=200)
     st.markdown("<h3 style='color:white;'>Help & Information</h3>", unsafe_allow_html=True)
     
     with st.expander("📚 What can I ask?"):
@@ -409,6 +408,6 @@ with st.sidebar:
     with st.expander("❓ Need help?"):
         st.markdown("""
         If you're experiencing any issues with the assistant, please contact the IT Service Desk:
-        - Email: support@schneider-electric.com
-        - Phone: +1-800-555-1234
+        - Email: support@sample.com
+        - 
         """)
