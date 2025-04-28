@@ -301,7 +301,7 @@ col1, col2, col3 = st.columns([1, 3, 1])
 with col2:
     # Header
     st.markdown('<div class="header">', unsafe_allow_html=True)
-    st.title("⚡ crm Salesforce Assistant")
+    st.title("⚡ CRM Salesforce Assistant")
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Introduction
