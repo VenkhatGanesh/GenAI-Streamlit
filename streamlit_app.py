@@ -122,51 +122,18 @@ st.markdown(f"""
 # Logo SVG data in base64
 def get_logo_b64(logo_name):
     if logo_name == "hub":
-        color = PRIMARY_COLOR
-        icon = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 2v20M2 12h20M12 12a4 4 0 0 0 0-8 4 4 0 0 0 0 8z"/>
-        </svg>
-        """
+        return "https://img.icons8.com/fluency/96/hub.png"
     elif logo_name == "crm":
-        color = ACCENT_COLOR_1
-        icon = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-        </svg>
-        """
+        return "https://img.icons8.com/fluency/96/customer-relationship-management.png"
     elif logo_name == "hr":
-        color = ACCENT_COLOR_2
-        icon = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="8.5" cy="7" r="4"/>
-            <polyline points="17 11 19 13 23 9"/>
-        </svg>
-        """
+        return "https://img.icons8.com/fluency/96/human-resources.png"
     elif logo_name == "inventory":
-        color = ACCENT_COLOR_3
-        icon = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 3h18v18H3z"/>
-            <path d="M21 12H3M12 3v18"/>
-        </svg>
-        """
+        return "https://img.icons8.com/fluency/96/inventory.png"
     elif logo_name == "greeting":
-        color = PRIMARY_COLOR
-        icon = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5Z"/>
-            <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>
-        </svg>
-        """
+        return "https://img.icons8.com/fluency/96/chat.png"
     
-    svg_content = f'<svg width="100%" height="100%" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="8" fill="{color}"/><g transform="translate(2, 2)" stroke="white">{icon}</g></svg>'
-    b64 = base64.b64encode(svg_content.encode("utf-8")).decode("utf-8")
-    return f"data:image/svg+xml;base64,{b64}"
+    # Default case - should never happen
+    return "https://img.icons8.com/fluency/96/artificial-intelligence.png"
 
 # Initialize session state
 if 'current_assistant' not in st.session_state:
@@ -229,51 +196,60 @@ def display_header():
 # Sidebar navigation
 def sidebar():
     with st.sidebar:
-        st.markdown(
-            """
-            <div class="sidebar-header">
-                <img src="https://assets.snaplogic.com/logo/snaplogic-RGB-3color.png" alt="SnapLogic Logo">
-                <h3>Enterprise AI Assistants</h3>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        st.title("Enterprise AI Assistants")
+        st.image("https://assets.snaplogic.com/logo/snaplogic-RGB-3color.png", width=200)
 
         # Assistant selection
         st.markdown("### Choose your Assistant")
         
-        # CRM Assistant Button
-        if st.button(
-            f"""<img src="{assistant_config['crm']['logo']}" class="sidebar-logo"> Shizoku - The CRM Assistant""",
-            key="crm_button",
-            use_container_width=True,
-            help="Access your CRM assistant",
-            type="primary" if st.session_state.current_assistant == "crm" else "secondary"
-        ):
-            st.session_state.current_assistant = "crm"
-            reset_conversation(add_welcome=True)
-            st.rerun()
+        # Display assistant buttons without HTML in them
+        col1, col2, col3 = st.columns([0.2, 0.8, 0.2])
         
-        # HR Assistant Button
-        if st.button(
-            f"""<img src="{assistant_config['hr']['logo']}" class="sidebar-logo"> Tomodachi - HR Assistant""",
-            key="hr_button",
-            use_container_width=True,
-            help="Access your HR assistant",
-            type="primary" if st.session_state.current_assistant == "hr" else "secondary"
-        ):
-            st.session_state.current_assistant = "hr"
-            reset_conversation(add_welcome=True)
-            st.rerun()
-        
-        # Inventory Assistant Button
-        if st.button(
-            f"""<img src="{assistant_config['inventory']['logo']}" class="sidebar-logo"> Zaiko - The Inventory Manager""",
-            key="inventory_button",
-            use_container_width=True,
-            help="Access your inventory management assistant",
-            type="primary" if st.session_state.current_assistant == "inventory" else "secondary"
-        ):
+        # CRM Assistant Button section
+        with col1:
+            st.image(assistant_config['crm']['logo'], width=30)
+        with col2:
+            if st.button(
+                "Shizoku - The CRM Assistant",
+                key="crm_button",
+                use_container_width=True,
+                help="Access your CRM assistant",
+                type="primary" if st.session_state.current_assistant == "crm" else "secondary"
+            ):
+                st.session_state.current_assistant = "crm"
+                reset_conversation(add_welcome=True)
+                st.rerun()
+        with col3:
+            st.write("")  # Empty column for spacing
+            
+        # HR Assistant Button section
+        with col1:
+            st.image(assistant_config['hr']['logo'], width=30)
+        with col2:
+            if st.button(
+                "Tomodachi - HR Assistant",
+                key="hr_button",
+                use_container_width=True,
+                help="Access your HR assistant",
+                type="primary" if st.session_state.current_assistant == "hr" else "secondary"
+            ):
+                st.session_state.current_assistant = "hr"
+                reset_conversation(add_welcome=True)
+                st.rerun()
+        with col3:
+            st.write("")  # Empty column for spacing
+            
+        # Inventory Assistant Button section
+        with col1:
+            st.image(assistant_config['inventory']['logo'], width=30)
+        with col2:
+            if st.button(
+                "Zaiko - The Inventory Manager",
+                key="inventory_button",
+                use_container_width=True,
+                help="Access your inventory management assistant",
+                type="primary" if st.session_state.current_assistant == "inventory" else "secondary"
+            ):
             st.session_state.current_assistant = "inventory"
             reset_conversation(add_welcome=True)
             st.rerun()
@@ -421,40 +397,19 @@ def main():
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.markdown(
-                f"""
-                <div style="text-align: center; padding: 1rem; border-radius: 10px; background-color: {ACCENT_COLOR_1}20; height: 200px;">
-                    <img src="{assistant_config['crm']['logo']}" style="width: 64px; height: 64px;">
-                    <h3>Shizoku</h3>
-                    <p>CRM Assistant for Salesforce data</p>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
+            st.image(assistant_config['crm']['logo'], width=64)
+            st.subheader("Shizoku")
+            st.write("CRM Assistant for Salesforce data")
         
         with col2:
-            st.markdown(
-                f"""
-                <div style="text-align: center; padding: 1rem; border-radius: 10px; background-color: {ACCENT_COLOR_2}20; height: 200px;">
-                    <img src="{assistant_config['hr']['logo']}" style="width: 64px; height: 64px;">
-                    <h3>Tomodachi</h3>
-                    <p>HR Assistant for employee information</p>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
+            st.image(assistant_config['hr']['logo'], width=64)
+            st.subheader("Tomodachi")
+            st.write("HR Assistant for employee information")
         
         with col3:
-            st.markdown(
-                f"""
-                <div style="text-align: center; padding: 1rem; border-radius: 10px; background-color: {ACCENT_COLOR_3}20; height: 200px;">
-                    <img src="{assistant_config['inventory']['logo']}" style="width: 64px; height: 64px;">
-                    <h3>Zaiko</h3>
-                    <p>Inventory Manager for gadget tracking</p>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
+            st.image(assistant_config['inventory']['logo'], width=64)
+            st.subheader("Zaiko")
+            st.write("Inventory Manager for gadget tracking")
         
     else:
         # Display the chat interface
@@ -466,9 +421,29 @@ def main():
             # Add user message to chat
             st.session_state.messages.append({"role": "user", "content": user_input})
             
-            # Display updated chat
+            # Show thinking status
+            with st.status("Thinking...", expanded=True):
+                st.write("Connecting to assistant API...")
+                
+                # Call API
+                response_data = call_assistant_api(st.session_state.messages[-1]["content"])
+                
+                if "response" in response_data:
+                    # Add assistant response to chat
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "content": response_data["response"]
+                    })
+                else:
+                    # Handle error
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "content": "I'm sorry, I couldn't process your request. Please try again."
+                    })
+            
+            # Rerun to update the UI with the new message
             st.rerun()
-    
+        
         # Process last user message if it hasn't been responded to
         if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
             with st.status("Thinking...", expanded=True):
