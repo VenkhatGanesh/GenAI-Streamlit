@@ -1,11 +1,10 @@
 import streamlit as st
 import requests
-import json
 import uuid
+import json
 import base64
 from datetime import datetime
-from io import BytesIO
-from PIL import Image
+import re
 
 # Set page configuration
 st.set_page_config(
@@ -15,449 +14,483 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for vibrant color scheme and styling
-st.markdown("""
+# Define some vibrant colors
+PRIMARY_COLOR = "#4361EE"
+SECONDARY_COLOR = "#3A0CA3"
+ACCENT_COLOR_1 = "#7209B7"
+ACCENT_COLOR_2 = "#F72585"
+ACCENT_COLOR_3 = "#4CC9F0"
+BG_COLOR = "#F8F9FA"
+TEXT_COLOR = "#212529"
+
+# Apply custom CSS
+st.markdown(f"""
 <style>
-    /* Main theme colors */
-    :root {
-        --primary-color: #4361ee;
-        --secondary-color: #3a0ca3;
-        --accent-color: #7209b7;
-        --background-color: #f8f9fa;
-        --text-color: #212529;
-        --success-color: #4cc9f0;
-        --light-color: #f1faee;
-    }
-    
-    /* General styling */
-    .stApp {
-        background-color: var(--background-color);
-        color: var(--text-color);
-    }
-    
-    /* Sidebar styling */
-    .css-1d391kg, .css-1lcbmhc {
-        background-image: linear-gradient(to bottom, #4361ee, #3a0ca3);
-    }
-    
-    .sidebar-link {
-        display: block;
-        padding: 15px;
-        margin: 10px 0;
-        background-color: rgba(255, 255, 255, 0.1);
+    .main .block-container {{
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }}
+    .stTextInput, .stTextArea {{
+        background-color: {BG_COLOR};
+    }}
+    .stButton>button {{
+        background-color: {PRIMARY_COLOR};
+        color: white;
+        border-radius: 5px;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+    }}
+    .stButton>button:hover {{
+        background-color: {SECONDARY_COLOR};
+    }}
+    .chat-message {{
+        padding: 1rem;
         border-radius: 10px;
-        color: white !important;
-        text-align: center;
-        text-decoration: none;
-        font-weight: bold;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .sidebar-link:hover {
-        transform: translateY(-2px);
-        background-color: rgba(255, 255, 255, 0.2);
-        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-    }
-    
-    .sidebar-link.active {
-        background-color: rgba(255, 255, 255, 0.3);
-        border-left: 4px solid #f72585;
-    }
-    
-    /* Chat container */
-    .chat-container {
-        background-color: white;
-        border-radius: 15px;
-        padding: 20px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-        margin-bottom: 20px;
-    }
-    
-    /* Message styling */
-    .user-message {
-        background-color: #e9ecef;
-        padding: 10px 15px;
-        border-radius: 15px 15px 15px 0;
-        margin: 5px 0;
-        display: inline-block;
-        max-width: 80%;
-    }
-    
-    .assistant-message {
-        background-color: var(--primary-color);
-        color: white;
-        padding: 10px 15px;
-        border-radius: 15px 15px 0 15px;
-        margin: 5px 0;
-        display: inline-block;
-        max-width: 80%;
-        float: right;
-        clear: both;
-    }
-    
-    /* Input box styling */
-    .stTextInput input {
-        border-radius: 20px;
-        border: 1px solid #ced4da;
-        padding: 10px 15px;
-    }
-    
-    /* Button styling */
-    .stButton>button {
-        border-radius: 20px;
-        background-color: var(--primary-color);
-        color: white;
-        font-weight: bold;
-        border: none;
-        padding: 10px 25px;
-        transition: all 0.3s ease;
-    }
-    
-    .stButton>button:hover {
-        background-color: var(--secondary-color);
-        transform: translateY(-2px);
-    }
-    
-    /* Logo styling */
-    .logo-container {
-        text-align: center;
-        margin-bottom: 20px;
-    }
-    
-    .logo {
-        width: 100px;
-        height: 100px;
+        margin-bottom: 1rem;
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+    }}
+    .chat-message.user {{
+        background-color: #E9ECEF;
+        color: {TEXT_COLOR};
+    }}
+    .chat-message.assistant {{
+        background-color: #D8E2DC;
+        color: {TEXT_COLOR};
+    }}
+    .chat-message .avatar {{
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
         object-fit: cover;
-        border: 3px solid white;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Header styling */
-    h1, h2, h3 {
-        color: var(--secondary-color);
-        font-weight: bold;
-    }
-    
-    /* Clear floats */
-    .clearfix {
-        clear: both;
-    }
-    
-    /* Message container */
-    .message-container {
-        margin-bottom: 15px;
-        overflow: hidden;
-    }
-    
-    /* Timestamp styling */
-    .timestamp {
-        font-size: 0.7em;
-        color: #6c757d;
-        margin-top: 2px;
-        text-align: right;
-    }
-    
-    /* Message content */
-    .message-content {
-        overflow-wrap: break-word;
-    }
-    
-    /* Code block styling */
-    code {
-        background-color: #f8f9fa;
-        padding: 2px 4px;
-        border-radius: 4px;
-        color: #e83e8c;
-    }
-    
-    pre {
-        background-color: #212529;
-        color: #f8f9fa;
-        padding: 10px;
+        margin-right: 1rem;
+    }}
+    .chat-message .message {{
+        flex-grow: 1;
+    }}
+    .logo-header {{
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }}
+    .logo-header img {{
+        height: 64px;
+        width: 64px;
+    }}
+    .logo-header h1 {{
+        margin: 0;
+        color: {PRIMARY_COLOR};
+    }}
+    .sidebar-logo {{
+        width: 32px;
+        height: 32px;
+        margin-right: 0.5rem;
+        vertical-align: middle;
+    }}
+    .sidebar-header {{
+        margin-bottom: 2rem;
+        text-align: center;
+    }}
+    .sidebar-header img {{
+        width: 150px;
+        height: auto;
+        margin-bottom: 1rem;
+    }}
+    code {{
+        white-space: pre-wrap !important;
+    }}
+    .json-block {{
+        background-color: #f5f5f5;
+        padding: 1rem;
         border-radius: 5px;
         overflow-x: auto;
-    }
-    
-    /* Welcome message styling */
-    .welcome-container {
-        text-align: center;
-        padding: 40px 20px;
-        background-color: white;
-        border-radius: 15px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
-    }
-    
-    .welcome-image {
-        max-width: 300px;
-        margin: 20px auto;
-        border-radius: 10px;
-    }
+        margin: 1rem 0;
+    }}
+    .session-status {{
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.5rem;
+    }}
+    .stMarkdown {{
+        overflow-wrap: break-word;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
-# Create or get session state variables
+# Logo SVG data in base64
+def get_logo_b64(logo_name):
+    if logo_name == "hub":
+        color = PRIMARY_COLOR
+        icon = """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 2v20M2 12h20M12 12a4 4 0 0 0 0-8 4 4 0 0 0 0 8z"/>
+        </svg>
+        """
+    elif logo_name == "crm":
+        color = ACCENT_COLOR_1
+        icon = """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        """
+    elif logo_name == "hr":
+        color = ACCENT_COLOR_2
+        icon = """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="8.5" cy="7" r="4"/>
+            <polyline points="17 11 19 13 23 9"/>
+        </svg>
+        """
+    elif logo_name == "inventory":
+        color = ACCENT_COLOR_3
+        icon = """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3h18v18H3z"/>
+            <path d="M21 12H3M12 3v18"/>
+        </svg>
+        """
+    elif logo_name == "greeting":
+        color = PRIMARY_COLOR
+        icon = """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5Z"/>
+            <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>
+        </svg>
+        """
+    
+    svg_content = f'<svg width="100%" height="100%" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="8" fill="{color}"/><g transform="translate(2, 2)" stroke="white">{icon}</g></svg>'
+    b64 = base64.b64encode(svg_content.encode("utf-8")).decode("utf-8")
+    return f"data:image/svg+xml;base64,{b64}"
+
+# Initialize session state
 if 'current_assistant' not in st.session_state:
-    st.session_state.current_assistant = None
-if 'conversation_history' not in st.session_state:
-    st.session_state.conversation_history = {}
+    st.session_state.current_assistant = "hub"
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
 if 'session_id' not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
-# Create assistant configurations
-assistant_configs = {
-    "shizoku": {
+# Define assistant configurations
+assistant_config = {
+    "hub": {
+        "name": "Enterprise Assistant Hub",
+        "logo": get_logo_b64("hub"),
+        "color": PRIMARY_COLOR,
+        "welcome_message": "👋 Welcome to the Enterprise Assistant Hub! Please select an assistant from the sidebar to get started.",
+    },
+    "crm": {
         "name": "Shizoku - The CRM Assistant",
-        "url": "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/HRASSIST_agent_driver_VG_api",
-        "auth": "Bearer z7gxfLKED6GRxY4Fdwcd9gcoWgJd5Q4c",
-        "logo": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTAgMjUwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjNDM2MWVlIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMWExODliIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iMTI1IiBjeT0iMTI1IiByPSIxMjAiIGZpbGw9InVybCgjYSkiLz48cGF0aCBkPSJNODAgODBoOTB2OTBIODBWODBaIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik05MCAxNDBoNzB2MzBIOTB2LTMwWiIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNMTYwIDgwaDMwdjkwaC0zMFY4MFoiIGZpbGw9IndoaXRlIi8+PHRleHQgeD0iODAiIHk9IjE5MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjI0IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiPlNoaXpva3U8L3RleHQ+PC9zdmc+",
-        "welcome_image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgMzAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjNDM2MWVlIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjM2EwY2EzIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjUwMCIgaGVpZ2h0PSIzMDAiIGZpbGw9InVybCgjYSkiIHJ4PSIxNSIvPjxjaXJjbGUgY3g9IjI1MCIgY3k9IjEyMCIgcj0iNzAiIGZpbGw9IndoaXRlIi8+PGNpcmNsZSBjeD0iMjIwIiBjeT0iMTAwIiByPSIxMCIgZmlsbD0iIzIxMjUyOSIvPjxjaXJjbGUgY3g9IjI4MCIgY3k9IjEwMCIgcj0iMTAiIGZpbGw9IiMyMTI1MjkiLz48cGF0aCBkPSJNMjEwIDE1MGMzMCAzMCA1MCAzMCA4MCAwIiBzdHJva2U9IiMyMTI1MjkiIHN0cm9rZS13aWR0aD0iOCIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHRleHQgeD0iMjUwIiB5PSIyMzAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIzMiIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5IaSEgSeKAmW0gU2hpem9rdSE8L3RleHQ+PHRleHQgeD0iMjUwIiB5PSIyNjUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyMCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPllvdXIgQ1JNIEF1Z21lbnRhdGlvbiBBc3Npc3RhbnQ8L3RleHQ+PC9zdmc+",
-        "welcome_message": "Welcome! I'm Shizoku, your CRM Assistant. I can help you access and analyze Salesforce CRM data, generate reports, and provide insights about your opportunities, contacts, and accounts. How can I assist you today?"
+        "logo": get_logo_b64("crm"),
+        "color": ACCENT_COLOR_1,
+        "api_url": "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/HRASSIST_agent_driver_VG_api",
+        "api_key": "Bearer z7gxfLKED6GRxY4Fdwcd9gcoWgJd5Q4c",
+        "welcome_message": "👋 Hello! I'm Shizoku, your CRM Assistant. I can help you retrieve and analyze data from your Salesforce opportunities. How can I assist you today?",
+        "greeting_image": get_logo_b64("greeting")
     },
-    "tomodachi": {
+    "hr": {
         "name": "Tomodachi - HR Assistant",
-        "url": "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/HRASSIST_agent_driver_VG_api",
-        "auth": "Bearer 6BJ0xGbyAourBtiSgp7c2AZrvGvQ4eEd",
-        "logo": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTAgMjUwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjNzIwOWI3Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjM2EwY2EzIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iMTI1IiBjeT0iMTI1IiByPSIxMjAiIGZpbGw9InVybCgjYSkiLz48Y2lyY2xlIGN4PSIxMjUiIGN5PSIxMDAiIHI9IjQwIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0xMjUgMTQwIGE1MCA1MCAwIDAgMCAtNTAgNTAgdjEwIGgxMDAgdi0xMCBhNTAgNTAgMCAwIDAgLTUwIC01MHoiIGZpbGw9IndoaXRlIi8+PHRleHQgeD0iODAiIHk9IjE5MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjI0IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiPlRvbW9kYWNoaTwvdGV4dD48L3N2Zz4=",
-        "welcome_image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgMzAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjNzIwOWI3Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjM2EwY2EzIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjUwMCIgaGVpZ2h0PSIzMDAiIGZpbGw9InVybCgjYSkiIHJ4PSIxNSIvPjxjaXJjbGUgY3g9IjE3NSIgY3k9IjEyMCIgcj0iNTAiIGZpbGw9IndoaXRlIi8+PGNpcmNsZSBjeD0iMzI1IiBjeT0iMTIwIiByPSI1MCIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSIxNjAiIGN5PSIxMDUiIHI9IjgiIGZpbGw9IiMyMTI1MjkiLz48Y2lyY2xlIGN4PSIxOTAiIGN5PSIxMDUiIHI9IjgiIGZpbGw9IiMyMTI1MjkiLz48Y2lyY2xlIGN4PSIzMTAiIGN5PSIxMDUiIHI9IjgiIGZpbGw9IiMyMTI1MjkiLz48Y2lyY2xlIGN4PSIzNDAiIGN5PSIxMDUiIHI9IjgiIGZpbGw9IiMyMTI1MjkiLz48cGF0aCBkPSJNMTUwIDE0MGMxNSAyMCAzNSAyMCA1MCAwIiBzdHJva2U9IiMyMTI1MjkiIHN0cm9rZS13aWR0aD0iNiIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHBhdGggZD0iTTMwMCAxNDBjMTUgMjAgMzUgMjAgNTAgMCIgc3Ryb2tlPSIjMjEyNTI5IiBzdHJva2Utd2lkdGg9IjYiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjx0ZXh0IHg9IjI1MCIgeT0iMjMwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMzIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+SGkhIFdl4oCZcmUgVG9tb2RhY2hpITwvdGV4dD48dGV4dCB4PSIyNTAiIHk9IjI2NSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjIwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+WW91ciBIUiBBc3Npc3RhbnQgVGVhbTwvdGV4dD48L3N2Zz4=",
-        "welcome_message": "Hello! We're Tomodachi, your HR Assistant team. We can help with HR policies, employee information, benefits, time-off requests, and other HR-related inquiries. How can we support you today?"
+        "logo": get_logo_b64("hr"),
+        "color": ACCENT_COLOR_2,
+        "api_url": "",  # URL not provided in the specifications
+        "api_key": "Bearer 6BJ0xGbyAourBtiSgp7c2AZrvGvQ4eEd",
+        "welcome_message": "👋 Hi there! I'm Tomodachi, your HR Assistant. I can help you with HR-related inquiries, employee information, and emergency contacts. How can I help you today?",
+        "greeting_image": get_logo_b64("greeting")
     },
-    "zaiko": {
+    "inventory": {
         "name": "Zaiko - The Inventory Manager",
-        "url": "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/GadgetStore_agent_driver_VG_api",
-        "auth": "Bearer JRJ5TFPwQMshJqxGVr0IQY5I5qYRGcDd",
-        "logo": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTAgMjUwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjNGNjOWYwIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGY0YzVjIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iMTI1IiBjeT0iMTI1IiByPSIxMjAiIGZpbGw9InVybCgjYSkiLz48cmVjdCB4PSI2MCIgeT0iOTAiIHdpZHRoPSIxMzAiIGhlaWdodD0iODAiIGZpbGw9IndoaXRlIiByeD0iNSIvPjxyZWN0IHg9IjgwIiB5PSI3MCIgd2lkdGg9IjkwIiBoZWlnaHQ9IjQwIiBmaWxsPSJ3aGl0ZSIgcng9IjUiLz48cmVjdCB4PSIxMDAiIHk9IjUwIiB3aWR0aD0iNTAiIGhlaWdodD0iNDAiIGZpbGw9IndoaXRlIiByeD0iNSIvPjxwYXRoIGQ9Ik03MCAxMDAgaDExMCBNOTAgODAgaDcwIE0xMTAgNjAgaDMwIiBzdHJva2U9IiMwZjRjNWMiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPjx0ZXh0IHg9IjgwIiB5PSIxOTAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IndoaXRlIj5aYWlrbzwvdGV4dD48L3N2Zz4=",
-        "welcome_image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgMzAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjNGNjOWYwIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGY0YzVjIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjUwMCIgaGVpZ2h0PSIzMDAiIGZpbGw9InVybCgjYSkiIHJ4PSIxNSIvPjxyZWN0IHg9IjEwMCIgeT0iNzAiIHdpZHRoPSIzMDAiIGhlaWdodD0iMTYwIiBmaWxsPSJ3aGl0ZSIgcng9IjEwIi8+PHJlY3QgeD0iMTIwIiB5PSI5MCIgd2lkdGg9IjI2MCIgaGVpZ2h0PSIxMjAiIGZpbGw9IiNmOGY5ZmEiIHJ4PSI1Ii8+PHJlY3QgeD0iMTQwIiB5PSIxMTAiIHdpZHRoPSI1MCIgaGVpZ2h0PSI4MCIgZmlsbD0iIzRjYzlmMCIgcng9IjUiLz48cmVjdCB4PSIyMDAiIHk9IjExMCIgd2lkdGg9IjUwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjNGNjOWYwIiByeD0iNSIvPjxyZWN0IHg9IjI2MCIgeT0iMTEwIiB3aWR0aD0iNTAiIGhlaWdodD0iODAiIGZpbGw9IiM0Y2M5ZjAiIHJ4PSI1Ii8+PHJlY3QgeD0iMzIwIiB5PSIxMTAiIHdpZHRoPSI1MCIgaGVpZ2h0PSI4MCIgZmlsbD0iIzRjYzlmMCIgcng9IjUiLz48dGV4dCB4PSIyNTAiIHk9IjI2MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjI4IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkhpISBJJ20gWmFpa28sIFlvdXIgSW52ZW50b3J5IE1hbmFnZXI8L3RleHQ+PC9zdmc+",
-        "welcome_message": "Hello! I'm Zaiko, your Inventory Manager. I can help you track gadget inventory, check stock levels, find product information, and manage inventory-related tasks. What would you like to know about our inventory today?"
+        "logo": get_logo_b64("inventory"),
+        "color": ACCENT_COLOR_3,
+        "api_url": "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/GadgetStore_agent_driver_VG_api",
+        "api_key": "Bearer JRJ5TFPwQMshJqxGVr0IQY5I5qYRGcDd",
+        "welcome_message": "👋 Greetings! I'm Zaiko, your Inventory Manager. I can help you manage and query your gadget inventory. What would you like to know about your inventory today?",
+        "greeting_image": get_logo_b64("greeting")
     }
 }
 
-# Initialize history for each assistant if not present
-for assistant_id in assistant_configs:
-    if assistant_id not in st.session_state.conversation_history:
-        st.session_state.conversation_history[assistant_id] = []
+# Display main logo and title
+def display_header():
+    assistant = assistant_config[st.session_state.current_assistant]
+    st.markdown(
+        f"""
+        <div class="logo-header">
+            <img src="{assistant['logo']}" alt="{assistant['name']} Logo">
+            <h1>{assistant['name']}</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-# Convert SVG data URI to image for display
-def svg_to_image(svg_data):
-    # Remove the data:image/svg+xml;base64, prefix
-    svg_data = svg_data.split(",")[-1] if "," in svg_data else svg_data
-    svg_bytes = base64.b64decode(svg_data)
-    return Image.open(BytesIO(svg_bytes))
-
-# Function to get current time
-def get_current_time():
-    return datetime.now().strftime("%H:%M")
-
-# Function to send message to assistant API
-def send_message_to_assistant(message, assistant_id):
-    config = assistant_configs[assistant_id]
-    
-    # Prepare the conversation history for the API
-    api_messages = []
-    for msg in st.session_state.conversation_history[assistant_id]:
-        api_messages.append({
-            "content": msg["content"],
-            "sl_role": "USER" if msg["role"] == "user" else "ASSISTANT"
-        })
-    
-    # Add the new message
-    api_messages.append({
-        "content": message,
-        "sl_role": "USER"
-    })
-    
-    # Prepare the payload
-    payload = json.dumps([{
-        "session_id": st.session_state.session_id,
-        "messages": api_messages
-    }])
-    
-    # Set up headers
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": config["auth"]
-    }
-    
-    try:
-        # Make the API call
-        response = requests.post(config["url"], headers=headers, data=payload)
-        
-        if response.status_code == 200:
-            response_data = response.json()
-            # For Shizoku and Zaiko, the response is structured differently
-            if assistant_id == "shizoku" or assistant_id == "zaiko":
-                return response_data.get("response", "Sorry, I couldn't process your request.")
-            # For Tomodachi, the response structure is different
-            elif assistant_id == "tomodachi":
-                # Handle the response based on the Tomodachi format
-                if isinstance(response_data, list) and len(response_data) > 0:
-                    # Extract the messages from the response
-                    messages = response_data[0].get("messages", [])
-                    if messages and len(messages) > 0:
-                        # Return the latest assistant message
-                        latest_messages = [m.get("content", "") for m in messages if m.get("sl_role") == "ASSISTANT"]
-                        if latest_messages:
-                            return latest_messages[-1]
-                return "Sorry, I couldn't process your request."
-        else:
-            return f"Error: {response.status_code}. Please try again later."
-    except Exception as e:
-        return f"An error occurred: {str(e)}"
-
-# Function to handle sending messages
-def handle_send():
-    user_message = st.session_state.user_input
-    if user_message:
-        # Add user message to conversation history
-        st.session_state.conversation_history[st.session_state.current_assistant].append({
-            "role": "user",
-            "content": user_message,
-            "time": get_current_time()
-        })
-        
-        # Clear input
-        st.session_state.user_input = ""
-        
-        # Send message to assistant and get response
-        assistant_response = send_message_to_assistant(user_message, st.session_state.current_assistant)
-        
-        # Add assistant response to conversation history
-        st.session_state.conversation_history[st.session_state.current_assistant].append({
-            "role": "assistant",
-            "content": assistant_response,
-            "time": get_current_time()
-        })
-
-# Main app layout
-def main():
-    # App title and header
-    col1, col2 = st.columns([1, 5])
-    with col1:
-        st.image("https://raw.githubusercontent.com/streamlit/example-app-chatgpt-redesign/main/app/static/bot-head.png", width=80)
-    with col2:
-        st.title("Enterprise Assistant Hub")
-        st.markdown("*Your all-in-one enterprise assistant platform*")
-    
-    # Create sidebar with navigation
+# Sidebar navigation
+def sidebar():
     with st.sidebar:
-        st.markdown("<h2 style='text-align: center;'>Assistant Directory</h2>", unsafe_allow_html=True)
-        
-        # Display logos for each assistant
-        for assistant_id, config in assistant_configs.items():
-            # Convert SVG to image
-            logo_img = svg_to_image(config["logo"])
-            
-            # Create columns for logo and name
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                st.image(logo_img, width=50)
-            with col2:
-                # Create a button with the assistant's name
-                if st.button(config["name"], key=f"btn_{assistant_id}"):
-                    st.session_state.current_assistant = assistant_id
-                    st.experimental_rerun()
-        
-        st.markdown("---")
         st.markdown(
             """
-            <div style='text-align: center; color: #6c757d;'>
-                <p>© 2025 Enterprise Assistant Hub</p>
-                <p style='font-size: 0.8em;'>Version 1.0.0</p>
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
-    
-    # Main content area
-    if st.session_state.current_assistant is None:
-        # Welcome screen when no assistant is selected
-        st.markdown(
-            """
-            <div class="welcome-container">
-                <h1>Welcome to Enterprise Assistant Hub</h1>
-                <p style='font-size: 1.2em;'>Select an assistant from the sidebar to get started.</p>
-                <img src="https://raw.githubusercontent.com/streamlit/example-app-chatgpt-redesign/main/app/static/bot-head.png" class="welcome-image">
-                <p>Our specialized assistants are here to help with CRM, HR, and Inventory management tasks.</p>
+            <div class="sidebar-header">
+                <img src="https://assets.snaplogic.com/logo/snaplogic-RGB-3color.png" alt="SnapLogic Logo">
+                <h3>Enterprise AI Assistants</h3>
             </div>
             """,
             unsafe_allow_html=True
         )
-    else:
-        # Get the current assistant config
-        config = assistant_configs[st.session_state.current_assistant]
+
+        # Assistant selection
+        st.markdown("### Choose your Assistant")
         
-        # Display conversation
-        st.markdown(f"<h2>{config['name']}</h2>", unsafe_allow_html=True)
+        # CRM Assistant Button
+        if st.button(
+            f"""<img src="{assistant_config['crm']['logo']}" class="sidebar-logo"> Shizoku - The CRM Assistant""",
+            key="crm_button",
+            use_container_width=True,
+            help="Access your CRM assistant",
+            type="primary" if st.session_state.current_assistant == "crm" else "secondary"
+        ):
+            st.session_state.current_assistant = "crm"
+            reset_conversation(add_welcome=True)
+            st.rerun()
         
-        # Chat container
-        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        # HR Assistant Button
+        if st.button(
+            f"""<img src="{assistant_config['hr']['logo']}" class="sidebar-logo"> Tomodachi - HR Assistant""",
+            key="hr_button",
+            use_container_width=True,
+            help="Access your HR assistant",
+            type="primary" if st.session_state.current_assistant == "hr" else "secondary"
+        ):
+            st.session_state.current_assistant = "hr"
+            reset_conversation(add_welcome=True)
+            st.rerun()
         
-        # If there's no conversation history for this assistant yet, show welcome message
-        if len(st.session_state.conversation_history[st.session_state.current_assistant]) == 0:
-            # Show welcome image
-            welcome_img = svg_to_image(config["welcome_image"])
-            st.image(welcome_img)
-            
-            # Add welcome message to conversation history
-            st.session_state.conversation_history[st.session_state.current_assistant].append({
-                "role": "assistant",
-                "content": config["welcome_message"],
-                "time": get_current_time()
-            })
-        
-        # Display messages in conversation history
-        for message in st.session_state.conversation_history[st.session_state.current_assistant]:
-            if message["role"] == "user":
-                st.markdown(
-                    f"""
-                    <div class="message-container">
-                        <div class="user-message">
-                            <div class="message-content">{message["content"]}</div>
-                            <div class="timestamp">{message["time"]}</div>
-                        </div>
-                        <div class="clearfix"></div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-            else:
-                st.markdown(
-                    f"""
-                    <div class="message-container">
-                        <div class="assistant-message">
-                            <div class="message-content">{message["content"]}</div>
-                            <div class="timestamp">{message["time"]}</div>
-                        </div>
-                        <div class="clearfix"></div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Input area
-        st.text_input(
-            "Type your message",
-            key="user_input",
-            on_change=handle_send
+        # Inventory Assistant Button
+        if st.button(
+            f"""<img src="{assistant_config['inventory']['logo']}" class="sidebar-logo"> Zaiko - The Inventory Manager""",
+            key="inventory_button",
+            use_container_width=True,
+            help="Access your inventory management assistant",
+            type="primary" if st.session_state.current_assistant == "inventory" else "secondary"
+        ):
+            st.session_state.current_assistant = "inventory"
+            reset_conversation(add_welcome=True)
+            st.rerun()
+
+        # Display session information
+        st.markdown(
+            f"""
+            <div class="session-status">
+                <strong>Session ID:</strong> {st.session_state.session_id[:8]}...<br>
+                <strong>Started:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M')}
+            </div>
+            """,
+            unsafe_allow_html=True
         )
         
-        # Information about the current assistant
-        with st.expander("About this assistant"):
+        # Reset conversation button
+        if st.button("🔄 Reset Conversation", use_container_width=True):
+            reset_conversation(add_welcome=True)
+            st.rerun()
+
+def reset_conversation(add_welcome=False):
+    st.session_state.messages = []
+    if add_welcome and st.session_state.current_assistant != "hub":
+        assistant = assistant_config[st.session_state.current_assistant]
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": assistant["welcome_message"],
+            "image": assistant["greeting_image"]
+        })
+
+# Format messages for API
+def format_messages_for_api(messages):
+    formatted_messages = []
+    for message in messages:
+        if message["role"] == "user":
+            formatted_messages.append({
+                "content": message["content"],
+                "sl_role": "USER"
+            })
+        elif message["role"] == "assistant":
+            # Skip assistant messages with images as they're just welcome messages
+            if "image" not in message:
+                formatted_messages.append({
+                    "content": message["content"],
+                    "sl_role": "ASSISTANT"
+                })
+    return formatted_messages
+
+# Function to call the API
+def call_assistant_api(user_input):
+    assistant_key = st.session_state.current_assistant
+    assistant = assistant_config[assistant_key]
+    
+    if not assistant.get("api_url"):
+        # If no API URL is provided, simulate a response for demo purposes
+        return {
+            "response": f"This is a simulated response for {assistant['name']}. In a production environment, this would connect to the API endpoint. Your message was: {user_input}"
+        }
+    
+    # Format the payload
+    payload = [{
+        "session_id": st.session_state.session_id,
+        "messages": format_messages_for_api(st.session_state.messages)
+    }]
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": assistant["api_key"]
+    }
+    
+    try:
+        response = requests.post(
+            assistant["api_url"],
+            headers=headers,
+            data=json.dumps(payload),
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {
+                "response": f"Error: Received status code {response.status_code} from the API. Please try again later."
+            }
+    except Exception as e:
+        return {
+            "response": f"Error: Could not connect to the API. {str(e)}"
+        }
+
+# Function to display chat messages
+def display_chat():
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            if "image" in message:
+                st.markdown(f'<img src="{message["image"]}" width="100">', unsafe_allow_html=True)
+            
+            # Process code blocks in the message
+            content = message["content"]
+            
+            # Parse markdown code blocks and JSON blocks for better formatting
+            if "```json" in content or "```" in content:
+                parts = re.split(r'(```(?:json)?\n[\s\S]*?\n```)', content)
+                for part in parts:
+                    if part.startswith("```json\n") or part.startswith("```\n"):
+                        # Extract the code content
+                        code_content = part.split("```")[1].strip()
+                        if code_content.startswith("json\n"):
+                            code_content = code_content[5:]
+                        
+                        # Try to format JSON nicely if it's valid JSON
+                        try:
+                            if code_content.strip().startswith("[") or code_content.strip().startswith("{"):
+                                parsed_json = json.loads(code_content)
+                                st.json(parsed_json)
+                            else:
+                                st.code(code_content)
+                        except:
+                            st.code(code_content)
+                    else:
+                        if part.strip():
+                            st.markdown(part)
+            else:
+                st.markdown(content)
+
+# Chat interface
+def main():
+    display_header()
+    sidebar()
+    
+    if st.session_state.current_assistant == "hub":
+        # Display welcome message for hub
+        st.markdown(f"# Welcome to Enterprise Assistant Hub")
+        st.markdown("""
+        This platform provides you with specialized AI assistants to help with different aspects of your enterprise operations.
+        
+        Please select an assistant from the sidebar to get started:
+        
+        - **Shizoku** - Your CRM Assistant for managing customer relationships
+        - **Tomodachi** - Your HR Assistant for human resources inquiries
+        - **Zaiko** - Your Inventory Manager for tracking and managing inventory
+        
+        Each assistant is specialized in its domain and can help you retrieve information, analyze data, and perform tasks.
+        """)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
             st.markdown(
                 f"""
-                ### {config['name']}
-                
-                This assistant connects to enterprise systems to provide intelligent assistance for your business needs.
-                
-                **Features:**
-                - Real-time data access
-                - Conversational interface
-                - Enterprise-grade security
-                """
+                <div style="text-align: center; padding: 1rem; border-radius: 10px; background-color: {ACCENT_COLOR_1}20; height: 200px;">
+                    <img src="{assistant_config['crm']['logo']}" style="width: 64px; height: 64px;">
+                    <h3>Shizoku</h3>
+                    <p>CRM Assistant for Salesforce data</p>
+                </div>
+                """, 
+                unsafe_allow_html=True
             )
+        
+        with col2:
+            st.markdown(
+                f"""
+                <div style="text-align: center; padding: 1rem; border-radius: 10px; background-color: {ACCENT_COLOR_2}20; height: 200px;">
+                    <img src="{assistant_config['hr']['logo']}" style="width: 64px; height: 64px;">
+                    <h3>Tomodachi</h3>
+                    <p>HR Assistant for employee information</p>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+        
+        with col3:
+            st.markdown(
+                f"""
+                <div style="text-align: center; padding: 1rem; border-radius: 10px; background-color: {ACCENT_COLOR_3}20; height: 200px;">
+                    <img src="{assistant_config['inventory']['logo']}" style="width: 64px; height: 64px;">
+                    <h3>Zaiko</h3>
+                    <p>Inventory Manager for gadget tracking</p>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+        
+    else:
+        # Display the chat interface
+        display_chat()
+        
+        # Handle user input
+        user_input = st.chat_input("Type your message here...")
+        if user_input:
+            # Add user message to chat
+            st.session_state.messages.append({"role": "user", "content": user_input})
+            
+            # Display updated chat
+            st.rerun()
+    
+        # Process last user message if it hasn't been responded to
+        if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
+            with st.status("Thinking...", expanded=True):
+                st.write("Connecting to assistant API...")
+                
+                # Call API
+                response_data = call_assistant_api(st.session_state.messages[-1]["content"])
+                
+                if "response" in response_data:
+                    # Add assistant response to chat
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "content": response_data["response"]
+                    })
+                    st.rerun()
+                else:
+                    # Handle error
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "content": "I'm sorry, I couldn't process your request. Please try again."
+                    })
+                    st.rerun()
 
 # Run the app
 if __name__ == "__main__":
