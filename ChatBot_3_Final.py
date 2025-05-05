@@ -142,6 +142,12 @@ if 'conversations' not in st.session_state:
 
 if 'logs' not in st.session_state:
     st.session_state.logs = {bot: [] for bot in bot_configs}
+    
+if 'retry_attempts' not in st.session_state:
+    st.session_state.retry_attempts = {bot: 0 for bot in bot_configs}
+    
+if 'request_in_progress' not in st.session_state:
+    st.session_state.request_in_progress = {bot: False for bot in bot_configs}
 
 # Function to add log entries
 def add_log(bot_name, message, level="INFO"):
@@ -164,10 +170,16 @@ def send_message(bot_name, user_message):
     # Add user message to conversation
     st.session_state.conversations[bot_name].append({"role": "user", "content": user_message})
     
+    # Add processing message for better UX
+    processing_id = f"processing_{time.time()}"
+    st.session_state.conversations[bot_name].append({"role": "assistant", "content": "Processing your request...", "id": processing_id, "temporary": True})
+    
     # Prepare conversation history for API
+    # Only include non-temporary messages
     conversation_for_api = [
         {"content": msg["content"], "sl_role": "USER" if msg["role"] == "user" else "ASSISTANT"}
-        for msg in st.session_state.conversations[bot_name]
+        for msg in st.session_state.conversations[bot_name] 
+        if not msg.get("temporary", False)
     ]
     
     # Prepare API payload
@@ -181,16 +193,24 @@ def send_message(bot_name, user_message):
         "Authorization": bot_config["auth"]
     }
     
+    st.session_state.request_in_progress[bot_name] = True
+    max_retries = 3
+    current_retry = st.session_state.retry_attempts[bot_name]
+    
     try:
-        add_log(bot_name, f"Sending request to {bot_config['url']}", "INFO")
+        add_log(bot_name, f"Sending request to {bot_config['url']} (Attempt {current_retry + 1}/{max_retries})", "INFO")
         start_time = time.time()
         
+        # Set a longer timeout for potentially slow APIs
         response = requests.post(
             bot_config["url"],
             headers=headers,
             data=json.dumps(payload),
-            timeout=30  # 30 seconds timeout
+            timeout=120  # 2 minutes timeout
         )
+        
+        # Reset retry counter on success
+        st.session_state.retry_attempts[bot_name] = 0
         
         elapsed_time = time.time() - start_time
         add_log(bot_name, f"Response received in {elapsed_time:.2f}s", "INFO")
@@ -214,6 +234,9 @@ def send_message(bot_name, user_message):
                     bot_response = response_data["response"]
                 
                 if bot_response:
+                    # Remove temporary processing message
+                    st.session_state.conversations[bot_name] = [msg for msg in st.session_state.conversations[bot_name] if not msg.get("temporary", False)]
+                    
                     # Add assistant response to conversation
                     st.session_state.conversations[bot_name].append({"role": "assistant", "content": bot_response})
                     return bot_response
@@ -233,14 +256,39 @@ def send_message(bot_name, user_message):
             return f"Sorry, I encountered an error: HTTP {response.status_code}. Please try again later."
             
     except requests.exceptions.Timeout:
-        error_msg = "Request timed out after 30 seconds."
-        add_log(bot_name, error_msg, "ERROR")
-        return "Sorry, the request timed out. Please try again later."
+        st.session_state.retry_attempts[bot_name] += 1
+        current_retry = st.session_state.retry_attempts[bot_name]
+        
+        if current_retry < max_retries:
+            error_msg = f"Request timed out after 120 seconds. Attempt {current_retry}/{max_retries}."
+            add_log(bot_name, error_msg, "WARNING")
+            # Let the user know we're retrying
+            return "The request is taking longer than expected. I'm trying again automatically. Please wait a moment..."
+        else:
+            # Reset retry counter after max attempts
+            st.session_state.retry_attempts[bot_name] = 0
+            error_msg = f"Request timed out after {max_retries} attempts."
+            add_log(bot_name, error_msg, "ERROR")
+            return f"Sorry, the request timed out after {max_retries} attempts. The service might be experiencing high load. Please try again later."
         
     except requests.exceptions.RequestException as e:
-        error_msg = f"Request error: {str(e)}"
-        add_log(bot_name, error_msg, "ERROR")
-        return f"Sorry, there was an error communicating with the service: {str(e)}"
+        st.session_state.retry_attempts[bot_name] += 1
+        current_retry = st.session_state.retry_attempts[bot_name]
+        
+        if current_retry < max_retries:
+            error_msg = f"Request error: {str(e)}. Attempt {current_retry}/{max_retries}."
+            add_log(bot_name, error_msg, "WARNING")
+            # Let the user know we're retrying
+            return "I encountered an error connecting to the service. I'm trying again automatically. Please wait a moment..."
+        else:
+            # Reset retry counter after max attempts
+            st.session_state.retry_attempts[bot_name] = 0
+            error_msg = f"Request failed after {max_retries} attempts: {str(e)}"
+            add_log(bot_name, error_msg, "ERROR")
+            return f"Sorry, I couldn't connect to the service after {max_retries} attempts. Please check your network connection or try again later."
+    
+    finally:
+        st.session_state.request_in_progress[bot_name] = False
 
 # Sidebar
 with st.sidebar:
@@ -269,8 +317,19 @@ with st.sidebar:
         st.session_state.session_ids[st.session_state.current_bot] = str(uuid.uuid4())
         st.session_state.conversations[st.session_state.current_bot] = []
         st.session_state.logs[st.session_state.current_bot] = []
+        st.session_state.retry_attempts[st.session_state.current_bot] = 0
+        st.session_state.request_in_progress[st.session_state.current_bot] = False
         add_log(st.session_state.current_bot, "New conversation started", "INFO")
         st.rerun()
+        
+    # Add connection status indicator
+    st.markdown("---")
+    st.subheader("Connection Status")
+    
+    if st.session_state.request_in_progress[st.session_state.current_bot]:
+        st.warning("⏳ Request in progress...")
+    else:
+        st.success("✅ Ready for requests")
 
 # Main area
 current_bot = st.session_state.current_bot
@@ -298,12 +357,22 @@ if user_input:
     with st.chat_message("user", avatar="👤"):
         st.write(user_input)
     
-    with st.spinner(f"{bot_config['icon']} Processing..."):
-        add_log(current_bot, f"User message: {user_input}", "INFO")
-        bot_response = send_message(current_bot, user_input)
+    # Use a background job approach to prevent UI freezing
+    add_log(current_bot, f"User message: {user_input}", "INFO")
     
+    # Add a placeholder for the response
     with st.chat_message("assistant", avatar=bot_config["icon"]):
-        st.write(bot_response)
+        response_placeholder = st.empty()
+        response_placeholder.write("Processing your request...")
+        
+        try:
+            # Send the message with increased timeout
+            bot_response = send_message(current_bot, user_input)
+            # Update the placeholder with the actual response
+            response_placeholder.write(bot_response)
+        except Exception as e:
+            add_log(current_bot, f"Unexpected error: {str(e)}", "ERROR")
+            response_placeholder.write(f"Sorry, I encountered an error. Please try again later. Error details: {str(e)}")
 
 # Advanced section with collapsible logs
 with st.expander("System Logs", expanded=False):
