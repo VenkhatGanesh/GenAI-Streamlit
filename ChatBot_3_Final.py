@@ -1,12 +1,22 @@
 import streamlit as st
 import requests
-import uuid
 import json
-import base64
+import uuid
+import time
 from datetime import datetime
-import re
+import logging
+import sys
+import io
+import traceback
 
-# Set page configuration
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Set page config
 st.set_page_config(
     page_title="Enterprise Assistant Hub",
     page_icon="🤖",
@@ -14,484 +24,355 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Define some vibrant colors
-PRIMARY_COLOR = "#4361EE"
-SECONDARY_COLOR = "#3A0CA3"
-ACCENT_COLOR_1 = "#7209B7"
-ACCENT_COLOR_2 = "#F72585"
-ACCENT_COLOR_3 = "#4CC9F0"
-BG_COLOR = "#F8F9FA"
-TEXT_COLOR = "#212529"
-
-# Apply custom CSS
-st.markdown(f"""
+# Apply custom CSS for dark theme
+st.markdown("""
 <style>
-    .main .block-container {{
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }}
-    .stTextInput, .stTextArea {{
-        background-color: {BG_COLOR};
-    }}
-    .stButton>button {{
-        background-color: {PRIMARY_COLOR};
-        color: white;
-        border-radius: 5px;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-    }}
-    .stButton>button:hover {{
-        background-color: {SECONDARY_COLOR};
-    }}
-    .chat-message {{
+    .main {
+        background-color: #1E1E1E;
+        color: #E0E0E0;
+    }
+    .stTextInput, .stTextArea {
+        background-color: #2D2D2D;
+        color: #E0E0E0;
+    }
+    .stButton>button {
+        background-color: #4F4F4F;
+        color: #E0E0E0;
+    }
+    .stButton>button:hover {
+        background-color: #616161;
+        color: #FFFFFF;
+    }
+    .stSidebar {
+        background-color: #252526;
+    }
+    .chat-message {
         padding: 1rem;
-        border-radius: 10px;
+        border-radius: 0.5rem;
         margin-bottom: 1rem;
         display: flex;
-        flex-direction: row;
-        align-items: flex-start;
-    }}
-    .chat-message.user {{
-        background-color: #E9ECEF;
-        color: {TEXT_COLOR};
-    }}
-    .chat-message.assistant {{
-        background-color: #D8E2DC;
-        color: {TEXT_COLOR};
-    }}
-    .chat-message .avatar {{
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        object-fit: cover;
-        margin-right: 1rem;
-    }}
-    .chat-message .message {{
-        flex-grow: 1;
-    }}
-    .logo-header {{
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 2rem;
-    }}
-    .logo-header img {{
-        height: 64px;
-        width: 64px;
-    }}
-    .logo-header h1 {{
-        margin: 0;
-        color: {PRIMARY_COLOR};
-    }}
-    .sidebar-logo {{
-        width: 32px;
-        height: 32px;
-        margin-right: 0.5rem;
-        vertical-align: middle;
-    }}
-    .sidebar-header {{
-        margin-bottom: 2rem;
-        text-align: center;
-    }}
-    .sidebar-header img {{
-        width: 150px;
-        height: auto;
-        margin-bottom: 1rem;
-    }}
-    code {{
-        white-space: pre-wrap !important;
-    }}
-    .json-block {{
-        background-color: #f5f5f5;
-        padding: 1rem;
-        border-radius: 5px;
-        overflow-x: auto;
-        margin: 1rem 0;
-    }}
-    .session-status {{
-        font-size: 0.8rem;
-        color: #6c757d;
+        flex-direction: column;
+    }
+    .chat-message-user {
+        background-color: #2C5282;
+        border-left: 5px solid #4299E1;
+    }
+    .chat-message-assistant {
+        background-color: #2D3748;
+        border-left: 5px solid #A0AEC0;
+    }
+    .chat-message-content {
         margin-top: 0.5rem;
-    }}
-    .stMarkdown {{
-        overflow-wrap: break-word;
-    }}
+        white-space: pre-wrap;
+    }
+    .chat-timestamp {
+        font-size: 0.75rem;
+        color: #A0AEC0;
+    }
+    .log-entry {
+        margin-bottom: 0.5rem;
+        padding: 0.5rem;
+        border-radius: 0.25rem;
+        font-family: monospace;
+        font-size: 0.85rem;
+    }
+    .log-info {
+        background-color: #2D3748;
+        border-left: 3px solid #4299E1;
+    }
+    .log-error {
+        background-color: #742A2A;
+        border-left: 3px solid #F56565;
+    }
+    .log-time {
+        font-size: 0.75rem;
+        color: #A0AEC0;
+    }
+    .assistant-title {
+        font-size: 1.25rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+        color: #90CDF4;
+    }
+    .assistant-description {
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+        color: #CBD5E0;
+    }
+    .stSidebar [data-testid="stSidebarNav"] {
+        background-color: #252526;
+    }
+    section[data-testid="stSidebar"] > div {
+        background-color: #252526;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #2D3748;
+        border-radius: 4px 4px 0px 0px;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #4A5568;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Logo SVG data in base64
-def get_logo_b64(logo_name):
-    if logo_name == "hub":
-        color = PRIMARY_COLOR
-        icon = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 2v20M2 12h20M12 12a4 4 0 0 0 0-8 4 4 0 0 0 0 8z"/>
-        </svg>
-        """
-    elif logo_name == "crm":
-        color = ACCENT_COLOR_1
-        icon = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-        </svg>
-        """
-    elif logo_name == "hr":
-        color = ACCENT_COLOR_2
-        icon = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="8.5" cy="7" r="4"/>
-            <polyline points="17 11 19 13 23 9"/>
-        </svg>
-        """
-    elif logo_name == "inventory":
-        color = ACCENT_COLOR_3
-        icon = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 3h18v18H3z"/>
-            <path d="M21 12H3M12 3v18"/>
-        </svg>
-        """
-    elif logo_name == "greeting":
-        color = PRIMARY_COLOR
-        icon = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5Z"/>
-            <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>
-        </svg>
-        """
-    
-    svg_content = f'<svg width="100%" height="100%" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="8" fill="{color}"/><g transform="translate(2, 2)" stroke="white">{icon}</g></svg>'
-    b64 = base64.b64encode(svg_content.encode("utf-8")).decode("utf-8")
-    return f"data:image/svg+xml;base64,{b64}"
-
 # Initialize session state
-if 'current_assistant' not in st.session_state:
-    st.session_state.current_assistant = "hub"
-if 'messages' not in st.session_state:
-    st.session_state.messages = []
-if 'session_id' not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = {}
 
-# Define assistant configurations
-assistant_config = {
-    "hub": {
-        "name": "Enterprise Assistant Hub",
-        "logo": get_logo_b64("hub"),
-        "color": PRIMARY_COLOR,
-        "welcome_message": "👋 Welcome to the Enterprise Assistant Hub! Please select an assistant from the sidebar to get started.",
-    },
-    "crm": {
+if 'session_ids' not in st.session_state:
+    st.session_state.session_ids = {}
+
+if 'current_assistant' not in st.session_state:
+    st.session_state.current_assistant = None
+
+if 'logs' not in st.session_state:
+    st.session_state.logs = {}
+
+# Define assistants
+assistants = {
+    "shizoku": {
         "name": "Shizoku - The CRM Assistant",
-        "logo": get_logo_b64("crm"),
-        "color": ACCENT_COLOR_1,
-        "api_url": "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/HRASSIST_agent_driver_VG_api",
-        "api_key": "Bearer z7gxfLKED6GRxY4Fdwcd9gcoWgJd5Q4c",
-        "welcome_message": "👋 Hello! I'm Shizoku, your CRM Assistant. I can help you retrieve and analyze data from your Salesforce opportunities. How can I assist you today?",
-        "greeting_image": get_logo_b64("greeting")
+        "description": "Your dedicated sales assistant for Salesforce CRM operations",
+        "url": "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/salesforce_agent_driver_VG_api",
+        "auth": "Bearer z7gxfLKED6GRxY4Fdwcd9gcoWgJd5Q4c",
+        "placeholder": "Ask about Salesforce data, opportunities, or customer information..."
     },
-    "hr": {
+    "tomodachi": {
         "name": "Tomodachi - HR Assistant",
-        "logo": get_logo_b64("hr"),
-        "color": ACCENT_COLOR_2,
-        "api_url": "",  # URL not provided in the specifications
-        "api_key": "Bearer 6BJ0xGbyAourBtiSgp7c2AZrvGvQ4eEd",
-        "welcome_message": "👋 Hi there! I'm Tomodachi, your HR Assistant. I can help you with HR-related inquiries, employee information, and emergency contacts. How can I help you today?",
-        "greeting_image": get_logo_b64("greeting")
+        "description": "Your helpful HR companion for employee information and workplace procedures",
+        "url": "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/HRASSIST_agent_driver_VG_api",
+        "auth": "Bearer 6BJ0xGbyAourBtiSgp7c2AZrvGvQ4eEd",
+        "placeholder": "Ask about HR policies, employee information, or workplace procedures..."
     },
-    "inventory": {
+    "zaiko": {
         "name": "Zaiko - The Inventory Manager",
-        "logo": get_logo_b64("inventory"),
-        "color": ACCENT_COLOR_3,
-        "api_url": "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/GadgetStore_agent_driver_VG_api",
-        "api_key": "Bearer JRJ5TFPwQMshJqxGVr0IQY5I5qYRGcDd",
-        "welcome_message": "👋 Greetings! I'm Zaiko, your Inventory Manager. I can help you manage and query your gadget inventory. What would you like to know about your inventory today?",
-        "greeting_image": get_logo_b64("greeting")
+        "description": "Your inventory specialist for gadget stock information and availability",
+        "url": "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/GadgetStore_agent_driver_VG_api",
+        "auth": "Bearer JRJ5TFPwQMshJqxGVr0IQY5I5qYRGcDd",
+        "placeholder": "Ask about inventory items, stock levels, or product details..."
     }
 }
 
-# Display main logo and title
-def display_header():
-    assistant = assistant_config[st.session_state.current_assistant]
-    st.markdown(
-        f"""
-        <div class="logo-header">
-            <img src="{assistant['logo']}" alt="{assistant['name']} Logo">
-            <h1>{assistant['name']}</h1>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-# Sidebar navigation
-def sidebar():
-    with st.sidebar:
-        st.markdown(
-            """
-            <div class="sidebar-header">
-                <img src="https://assets.snaplogic.com/logo/snaplogic-RGB-3color.png" alt="SnapLogic Logo">
-                <h3>Enterprise AI Assistants</h3>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        # Assistant selection
-        st.markdown("### Choose your Assistant")
-        
-        # CRM Assistant Button
-        if st.button(
-            f"""<img src="{assistant_config['crm']['logo']}" class="sidebar-logo"> Shizoku - The CRM Assistant""",
-            key="crm_button",
-            use_container_width=True,
-            help="Access your CRM assistant",
-            type="primary" if st.session_state.current_assistant == "crm" else "secondary"
-        ):
-            st.session_state.current_assistant = "crm"
-            reset_conversation(add_welcome=True)
-            st.rerun()
-        
-        # HR Assistant Button
-        if st.button(
-            f"""<img src="{assistant_config['hr']['logo']}" class="sidebar-logo"> Tomodachi - HR Assistant""",
-            key="hr_button",
-            use_container_width=True,
-            help="Access your HR assistant",
-            type="primary" if st.session_state.current_assistant == "hr" else "secondary"
-        ):
-            st.session_state.current_assistant = "hr"
-            reset_conversation(add_welcome=True)
-            st.rerun()
-        
-        # Inventory Assistant Button
-        if st.button(
-            f"""<img src="{assistant_config['inventory']['logo']}" class="sidebar-logo"> Zaiko - The Inventory Manager""",
-            key="inventory_button",
-            use_container_width=True,
-            help="Access your inventory management assistant",
-            type="primary" if st.session_state.current_assistant == "inventory" else "secondary"
-        ):
-            st.session_state.current_assistant = "inventory"
-            reset_conversation(add_welcome=True)
-            st.rerun()
-
-        # Display session information
-        st.markdown(
-            f"""
-            <div class="session-status">
-                <strong>Session ID:</strong> {st.session_state.session_id[:8]}...<br>
-                <strong>Started:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M')}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        
-        # Reset conversation button
-        if st.button("🔄 Reset Conversation", use_container_width=True):
-            reset_conversation(add_welcome=True)
-            st.rerun()
-
-def reset_conversation(add_welcome=False):
-    st.session_state.messages = []
-    if add_welcome and st.session_state.current_assistant != "hub":
-        assistant = assistant_config[st.session_state.current_assistant]
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": assistant["welcome_message"],
-            "image": assistant["greeting_image"]
-        })
-
-# Format messages for API
-def format_messages_for_api(messages):
-    formatted_messages = []
-    for message in messages:
-        if message["role"] == "user":
-            formatted_messages.append({
-                "content": message["content"],
-                "sl_role": "USER"
-            })
-        elif message["role"] == "assistant":
-            # Skip assistant messages with images as they're just welcome messages
-            if "image" not in message:
-                formatted_messages.append({
-                    "content": message["content"],
-                    "sl_role": "ASSISTANT"
-                })
-    return formatted_messages
-
-# Function to call the API
-def call_assistant_api(user_input):
-    assistant_key = st.session_state.current_assistant
-    assistant = assistant_config[assistant_key]
+def log_message(assistant_id, level, message):
+    """Add a log message to the session state logs for the specified assistant"""
+    if assistant_id not in st.session_state.logs:
+        st.session_state.logs[assistant_id] = []
     
-    if not assistant.get("api_url"):
-        # If no API URL is provided, simulate a response for demo purposes
-        return {
-            "response": f"This is a simulated response for {assistant['name']}. In a production environment, this would connect to the API endpoint. Your message was: {user_input}"
-        }
-    
-    # Format the payload
-    payload = [{
-        "session_id": st.session_state.session_id,
-        "messages": format_messages_for_api(st.session_state.messages)
-    }]
-    
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": assistant["api_key"]
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    log_entry = {
+        "timestamp": timestamp,
+        "level": level,
+        "message": message
     }
+    st.session_state.logs[assistant_id].append(log_entry)
+
+def create_session_id(assistant_id):
+    """Create a new session ID for the specified assistant"""
+    session_id = str(uuid.uuid4())
+    st.session_state.session_ids[assistant_id] = session_id
+    st.session_state.chat_history[assistant_id] = []
+    log_message(assistant_id, "INFO", f"Created new session with ID: {session_id}")
+    return session_id
+
+def send_message(assistant_id, message):
+    """Send a message to the specified assistant and return the response"""
+    assistant = assistants[assistant_id]
+    session_id = st.session_state.session_ids.get(assistant_id)
+    
+    if not session_id:
+        session_id = create_session_id(assistant_id)
+    
+    # Add user message to chat history
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.session_state.chat_history[assistant_id].append({
+        "role": "user",
+        "content": message,
+        "timestamp": timestamp
+    })
+    
+    # Prepare request payload
+    message_history = [{"content": msg["content"], "sl_role": "USER" if msg["role"] == "user" else "ASSISTANT"} 
+                       for msg in st.session_state.chat_history[assistant_id]]
+    
+    payload = [{"session_id": session_id, "messages": message_history}]
+    
+    log_message(assistant_id, "INFO", f"Sending request to {assistant['name']}")
+    log_message(assistant_id, "INFO", f"Payload: {json.dumps(payload, indent=2)}")
     
     try:
-        response = requests.post(
-            assistant["api_url"],
-            headers=headers,
-            data=json.dumps(payload),
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {
-                "response": f"Error: Received status code {response.status_code} from the API. Please try again later."
-            }
-    except Exception as e:
-        return {
-            "response": f"Error: Could not connect to the API. {str(e)}"
+        # Send request to API
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": assistant["auth"]
         }
-
-# Function to display chat messages
-def display_chat():
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            if "image" in message:
-                st.markdown(f'<img src="{message["image"]}" width="100">', unsafe_allow_html=True)
-            
-            # Process code blocks in the message
-            content = message["content"]
-            
-            # Parse markdown code blocks and JSON blocks for better formatting
-            if "```json" in content or "```" in content:
-                parts = re.split(r'(```(?:json)?\n[\s\S]*?\n```)', content)
-                for part in parts:
-                    if part.startswith("```json\n") or part.startswith("```\n"):
-                        # Extract the code content
-                        code_content = part.split("```")[1].strip()
-                        if code_content.startswith("json\n"):
-                            code_content = code_content[5:]
-                        
-                        # Try to format JSON nicely if it's valid JSON
-                        try:
-                            if code_content.strip().startswith("[") or code_content.strip().startswith("{"):
-                                parsed_json = json.loads(code_content)
-                                st.json(parsed_json)
-                            else:
-                                st.code(code_content)
-                        except:
-                            st.code(code_content)
-                    else:
-                        if part.strip():
-                            st.markdown(part)
-            else:
-                st.markdown(content)
-
-# Chat interface
-def main():
-    display_header()
-    sidebar()
-    
-    if st.session_state.current_assistant == "hub":
-        # Display welcome message for hub
-        st.markdown(f"# Welcome to Enterprise Assistant Hub")
-        st.markdown("""
-        This platform provides you with specialized AI assistants to help with different aspects of your enterprise operations.
         
-        Please select an assistant from the sidebar to get started:
+        start_time = time.time()
+        response = requests.post(
+            assistant["url"],
+            headers=headers,
+            json=payload
+        )
+        elapsed_time = time.time() - start_time
         
-        - **Shizoku** - Your CRM Assistant for managing customer relationships
-        - **Tomodachi** - Your HR Assistant for human resources inquiries
-        - **Zaiko** - Your Inventory Manager for tracking and managing inventory
+        log_message(assistant_id, "INFO", f"Response received in {elapsed_time:.2f} seconds")
+        log_message(assistant_id, "INFO", f"Status code: {response.status_code}")
         
-        Each assistant is specialized in its domain and can help you retrieve information, analyze data, and perform tasks.
-        """)
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown(
-                f"""
-                <div style="text-align: center; padding: 1rem; border-radius: 10px; background-color: {ACCENT_COLOR_1}20; height: 200px;">
-                    <img src="{assistant_config['crm']['logo']}" style="width: 64px; height: 64px;">
-                    <h3>Shizoku</h3>
-                    <p>CRM Assistant for Salesforce data</p>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
-        
-        with col2:
-            st.markdown(
-                f"""
-                <div style="text-align: center; padding: 1rem; border-radius: 10px; background-color: {ACCENT_COLOR_2}20; height: 200px;">
-                    <img src="{assistant_config['hr']['logo']}" style="width: 64px; height: 64px;">
-                    <h3>Tomodachi</h3>
-                    <p>HR Assistant for employee information</p>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
-        
-        with col3:
-            st.markdown(
-                f"""
-                <div style="text-align: center; padding: 1rem; border-radius: 10px; background-color: {ACCENT_COLOR_3}20; height: 200px;">
-                    <img src="{assistant_config['inventory']['logo']}" style="width: 64px; height: 64px;">
-                    <h3>Zaiko</h3>
-                    <p>Inventory Manager for gadget tracking</p>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
-        
-    else:
-        # Display the chat interface
-        display_chat()
-        
-        # Handle user input
-        user_input = st.chat_input("Type your message here...")
-        if user_input:
-            # Add user message to chat
-            st.session_state.messages.append({"role": "user", "content": user_input})
-            
-            # Display updated chat
-            st.rerun()
-    
-        # Process last user message if it hasn't been responded to
-        if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
-            with st.status("Thinking...", expanded=True):
-                st.write("Connecting to assistant API...")
+        # Process response
+        if response.status_code == 200:
+            try:
+                response_data = response.json()
+                log_message(assistant_id, "INFO", f"Response: {json.dumps(response_data, indent=2)}")
                 
-                # Call API
-                response_data = call_assistant_api(st.session_state.messages[-1]["content"])
-                
-                if "response" in response_data:
-                    # Add assistant response to chat
-                    st.session_state.messages.append({
-                        "role": "assistant", 
-                        "content": response_data["response"]
-                    })
-                    st.rerun()
+                # For different response formats
+                if assistant_id in ["tomodachi", "zaiko"]:
+                    # Format for tomodachi and zaiko
+                    assistant_response = response_data.get("response", "")
                 else:
-                    # Handle error
-                    st.session_state.messages.append({
-                        "role": "assistant", 
-                        "content": "I'm sorry, I couldn't process your request. Please try again."
-                    })
-                    st.rerun()
+                    # Format for shizoku
+                    if isinstance(response_data, list) and len(response_data) > 0:
+                        messages = response_data[0].get("messages", [])
+                        # Get the last assistant message
+                        assistant_messages = [msg["content"] for msg in messages if msg.get("sl_role") == "ASSISTANT"]
+                        assistant_response = assistant_messages[-1] if assistant_messages else "No response from assistant"
+                    else:
+                        assistant_response = "Unexpected response format"
+                
+                # Add assistant response to chat history
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                st.session_state.chat_history[assistant_id].append({
+                    "role": "assistant",
+                    "content": assistant_response,
+                    "timestamp": timestamp
+                })
+                
+                return assistant_response
+                
+            except Exception as e:
+                error_msg = f"Error parsing response: {str(e)}"
+                log_message(assistant_id, "ERROR", error_msg)
+                log_message(assistant_id, "ERROR", traceback.format_exc())
+                return f"Error: {error_msg}"
+        else:
+            error_msg = f"Error: {response.status_code} - {response.text}"
+            log_message(assistant_id, "ERROR", error_msg)
+            return f"Error: Request failed with status code {response.status_code}"
+            
+    except Exception as e:
+        error_msg = f"Exception occurred: {str(e)}"
+        log_message(assistant_id, "ERROR", error_msg)
+        log_message(assistant_id, "ERROR", traceback.format_exc())
+        return f"Error: {error_msg}"
+
+def display_chat_history(assistant_id):
+    """Display the chat history for the specified assistant"""
+    if assistant_id not in st.session_state.chat_history:
+        return
+    
+    for message in st.session_state.chat_history[assistant_id]:
+        message_type = "user" if message["role"] == "user" else "assistant"
+        
+        with st.container():
+            st.markdown(f"""
+            <div class="chat-message chat-message-{message_type}">
+                <div class="chat-timestamp">{message["timestamp"]} | {message_type.capitalize()}</div>
+                <div class="chat-message-content">{message["content"]}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+def display_logs(assistant_id):
+    """Display the logs for the specified assistant"""
+    if assistant_id not in st.session_state.logs:
+        return
+    
+    for log in st.session_state.logs[assistant_id]:
+        log_class = "log-error" if log["level"] == "ERROR" else "log-info"
+        
+        st.markdown(f"""
+        <div class="log-entry {log_class}">
+            <span class="log-time">{log["timestamp"]} | {log["level"]}</span>
+            <div>{log["message"]}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# Sidebar - Select assistant
+with st.sidebar:
+    st.title("Enterprise Assistant Hub")
+    st.markdown("---")
+    
+    for assistant_id, assistant in assistants.items():
+        if st.button(assistant["name"], key=f"select_{assistant_id}", use_container_width=True):
+            st.session_state.current_assistant = assistant_id
+            if assistant_id not in st.session_state.session_ids:
+                create_session_id(assistant_id)
+    
+    st.markdown("---")
+    st.caption("Enterprise Assistant Hub v1.0.0")
+    st.caption("© 2025 Connect Faster Inc.")
+
+# Main area - Chat interface
+if st.session_state.current_assistant:
+    assistant_id = st.session_state.current_assistant
+    assistant = assistants[assistant_id]
+    
+    # Display assistant title and description
+    st.markdown(f"""
+    <div class="assistant-title">{assistant["name"]}</div>
+    <div class="assistant-description">{assistant["description"]}</div>
+    """, unsafe_allow_html=True)
+    
+    # Create tabs for chat and logs
+    tab1, tab2 = st.tabs(["Chat", "Logs"])
+    
+    with tab1:
+        # Display chat history
+        chat_container = st.container()
+        with chat_container:
+            display_chat_history(assistant_id)
+        
+        # User input
+        with st.container():
+            user_input = st.text_input(
+                "Your message",
+                placeholder=assistant["placeholder"],
+                key=f"input_{assistant_id}"
+            )
+            
+            col1, col2 = st.columns([6, 1])
+            with col2:
+                if st.button("Send", key=f"send_{assistant_id}", use_container_width=True):
+                    if user_input:
+                        with st.spinner("Processing..."):
+                            response = send_message(assistant_id, user_input)
+                        st.experimental_rerun()
+    
+    with tab2:
+        # Display logs
+        logs_container = st.container()
+        with logs_container:
+            display_logs(assistant_id)
+        
+        if st.button("Clear Logs", key=f"clear_logs_{assistant_id}"):
+            st.session_state.logs[assistant_id] = []
+            log_message(assistant_id, "INFO", "Logs cleared")
+            st.experimental_rerun()
+else:
+    # Welcome screen
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem;">
+        <h1 style="color: #90CDF4;">Welcome to Enterprise Assistant Hub</h1>
+        <p style="color: #CBD5E0; font-size: 1.1rem; margin-bottom: 2rem;">
+            Your centralized platform for intelligent business assistants
+        </p>
+        <div style="font-size: 5rem; margin-bottom: 2rem;">🤖</div>
+        <p style="color: #A0AEC0;">
+            Please select an assistant from the sidebar to begin.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Run the app
 if __name__ == "__main__":
-    main()
+    pass  # The app is already running through Streamlit
