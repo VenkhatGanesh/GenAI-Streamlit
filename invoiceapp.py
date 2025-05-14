@@ -7,7 +7,7 @@ import os
 
 # Set page configuration
 st.set_page_config(
-    page_title="Invoice Upload Tool",
+    page_title="Invoice Comparison Tool",
     page_icon="📝",
     layout="centered"
 )
@@ -31,10 +31,6 @@ uploaded_files = st.file_uploader("Upload Invoice PDF files", type=['pdf'], acce
 # Initialize session state if it doesn't exist
 if 'upload_history' not in st.session_state:
     st.session_state.upload_history = []
-
-# Flag to track history clearing
-if 'clear_history' not in st.session_state:
-    st.session_state.clear_history = False
 
 # Process the uploaded files
 if uploaded_files and st.button("Compare Invoice"):
@@ -68,7 +64,7 @@ if uploaded_files and st.button("Compare Invoice"):
                     "status": "Success",
                     "response": response_data
                 })
-                st.success(f"Successfully uploaded {file_name}")
+                st.success(f"Successfully processed {file_name}")
             else:
                 # Add failed upload to history
                 st.session_state.upload_history.append({
@@ -77,7 +73,7 @@ if uploaded_files and st.button("Compare Invoice"):
                     "status": "Failed",
                     "response": f"Error {response.status_code}: {response.text}"
                 })
-                st.error(f"Failed to upload {file_name}. Error: {response.status_code} - {response.text}")
+                st.error(f"Failed to process {file_name}. Error: {response.status_code} - {response.text}")
         
         except Exception as e:
             # Add error to history
@@ -97,52 +93,9 @@ if uploaded_files and st.button("Compare Invoice"):
     status_text.empty()
     progress_bar.empty()
 
-# Display chat interface
-st.markdown("### Chat Support")
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Display chat messages from history
-for message in st.session_state.messages:
-    if message["role"] == "user":
-        st.text_area("You:", value=message["content"], height=50, disabled=True, key=f"user_{len(st.session_state.messages)}")
-    else:
-        st.text_area("Assistant:", value=message["content"], height=100, disabled=True, key=f"assistant_{len(st.session_state.messages)}")
-
-# Get user input
-user_prompt = st.text_input("Ask a question about invoice uploads...", key="chat_input")
-if st.button("Send", key="send_button"):
-    if user_prompt:
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": user_prompt})
-        
-        # Prepare assistant response
-        assistant_response = ""
-        
-        # Simple response logic based on keywords
-        prompt_lower = user_prompt.lower()
-        if "how" in prompt_lower and "upload" in prompt_lower:
-            assistant_response = "To upload invoices, click the 'Browse files' button above, select one or more PDF files, then click 'Submit Invoices'."
-        elif "format" in prompt_lower or "file type" in prompt_lower:
-            assistant_response = "This tool accepts invoice files in PDF format only."
-        elif "history" in prompt_lower or "previous" in prompt_lower:
-            assistant_response = "You can view your upload history in the table below the chat interface."
-        elif "error" in prompt_lower or "fail" in prompt_lower:
-            assistant_response = "If you're experiencing errors, please ensure your files are valid PDFs and try again. If problems persist, check your network connection."
-        elif "api" in prompt_lower or "endpoint" in prompt_lower:
-            assistant_response = "The system is using a secure API endpoint to process your invoice files. Your data is being transmitted securely."
-        else:
-            assistant_response = "I'm your invoice upload assistant. I can help you upload PDF invoices to our processing system. Feel free to ask if you have any questions!"
-        
-        # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": assistant_response})
-        
-        # Use st.rerun() instead of experimental_rerun
-        st.rerun()
-
 # Display upload history
 if st.session_state.upload_history:
-    st.markdown("### Upload History")
+    st.markdown("### Processing History")
     
     # Display each history item in a separate expander
     for idx, item in enumerate(reversed(st.session_state.upload_history)):
