@@ -13,8 +13,8 @@ st.set_page_config(
 )
 
 # Define API details
-API_URL = "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/post-file-tool_API"
-API_TOKEN = "SWXx74parYQZkO4L8rW6eiMkpzGOCUAj"
+API_URL = "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/CompareInvoiceapi"
+API_TOKEN = "nCMe9Ctzo0gkEvj2yoj6mbacRDe6b9dd"
 HEADERS = {
     "Authorization": f"Bearer {API_TOKEN}"
 }
