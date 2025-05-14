@@ -98,62 +98,69 @@ st.markdown("### Chat Support")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display chat messages
+# Display chat messages from history
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    if message["role"] == "user":
+        st.text_area("You:", value=message["content"], height=50, disabled=True, key=f"user_{len(st.session_state.messages)}")
+    else:
+        st.text_area("Assistant:", value=message["content"], height=100, disabled=True, key=f"assistant_{len(st.session_state.messages)}")
 
 # Get user input
-prompt = st.chat_input("Ask a question about invoice uploads...")
-if prompt:
-    # Add user message to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    
-    # Display user message
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    
-    # Prepare assistant response
-    assistant_response = ""
-    
-    # Simple response logic based on keywords
-    prompt_lower = prompt.lower()
-    if "how" in prompt_lower and "upload" in prompt_lower:
-        assistant_response = "To upload invoices, click the 'Browse files' button above, select one or more PDF files, then click 'Submit Invoices'."
-    elif "format" in prompt_lower or "file type" in prompt_lower:
-        assistant_response = "This tool accepts invoice files in PDF format only."
-    elif "history" in prompt_lower or "previous" in prompt_lower:
-        assistant_response = "You can view your upload history in the table below the chat interface."
-    elif "error" in prompt_lower or "fail" in prompt_lower:
-        assistant_response = "If you're experiencing errors, please ensure your files are valid PDFs and try again. If problems persist, check your network connection."
-    elif "api" in prompt_lower or "endpoint" in prompt_lower:
-        assistant_response = "The system is using a secure API endpoint to process your invoice files. Your data is being transmitted securely."
-    else:
-        assistant_response = "I'm your invoice upload assistant. I can help you upload PDF invoices to our processing system. Feel free to ask if you have any questions!"
-    
-    # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": assistant_response})
-    
-    # Display assistant response
-    with st.chat_message("assistant"):
-        st.markdown(assistant_response)
+user_prompt = st.text_input("Ask a question about invoice uploads...", key="chat_input")
+if st.button("Send", key="send_button"):
+    if user_prompt:
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": user_prompt})
+        
+        # Prepare assistant response
+        assistant_response = ""
+        
+        # Simple response logic based on keywords
+        prompt_lower = user_prompt.lower()
+        if "how" in prompt_lower and "upload" in prompt_lower:
+            assistant_response = "To upload invoices, click the 'Browse files' button above, select one or more PDF files, then click 'Submit Invoices'."
+        elif "format" in prompt_lower or "file type" in prompt_lower:
+            assistant_response = "This tool accepts invoice files in PDF format only."
+        elif "history" in prompt_lower or "previous" in prompt_lower:
+            assistant_response = "You can view your upload history in the table below the chat interface."
+        elif "error" in prompt_lower or "fail" in prompt_lower:
+            assistant_response = "If you're experiencing errors, please ensure your files are valid PDFs and try again. If problems persist, check your network connection."
+        elif "api" in prompt_lower or "endpoint" in prompt_lower:
+            assistant_response = "The system is using a secure API endpoint to process your invoice files. Your data is being transmitted securely."
+        else:
+            assistant_response = "I'm your invoice upload assistant. I can help you upload PDF invoices to our processing system. Feel free to ask if you have any questions!"
+        
+        # Add assistant response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+        
+        # Rerun the app to show the new messages
+        st.experimental_rerun()
 
 # Display upload history
 if st.session_state.upload_history:
     st.markdown("### Upload History")
     
-    # Create a dataframe-like display of upload history
-    st.markdown("| Timestamp | Filename | Status | Response |")
-    st.markdown("|-----------|----------|--------|----------|")
+    # Create a proper dataframe for better display
+    import pandas as pd
     
-    # Display most recent uploads first
-    for item in reversed(st.session_state.upload_history):
-        # Truncate response for display if it's too long
+    # Extract relevant information for display
+    history_data = []
+    for item in st.session_state.upload_history:
+        # Format the response for better display
         response_display = str(item["response"])
         if len(response_display) > 50:
             response_display = response_display[:47] + "..."
         
-        st.markdown(f"| {item['timestamp']} | {item['filename']} | {item['status']} | {response_display} |")
+        history_data.append({
+            "Timestamp": item["timestamp"],
+            "Filename": item["filename"],
+            "Status": item["status"],
+            "Response": response_display
+        })
+    
+    # Create dataframe and display as a table
+    history_df = pd.DataFrame(history_data)
+    st.dataframe(history_df, use_container_width=True)
     
     # Add option to clear history
     if st.button("Clear Upload History"):
