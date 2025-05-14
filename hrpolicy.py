@@ -11,8 +11,8 @@ st.set_page_config(
 )
 
 # API Details
-API_URL = "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/ToolHRpolicy_Infoapi"
-API_KEY = "Bearer EozRkXEdC9vMwe6TBB7EXohXvJc8hUdF"
+API_URL = "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/HR_Policy_Driver_api"
+API_KEY = "Bearer 3RslysNL8upsL7Hp6ownhZJMJFwzvdJm"
 
 # Initialize session state
 if "messages" not in st.session_state:
