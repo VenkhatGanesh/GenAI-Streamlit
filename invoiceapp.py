@@ -140,27 +140,13 @@ if st.button("Send", key="send_button"):
 if st.session_state.upload_history:
     st.markdown("### Upload History")
     
-    # Create a proper dataframe for better display
-    import pandas as pd
-    
-    # Extract relevant information for display
-    history_data = []
-    for item in st.session_state.upload_history:
-        # Format the response for better display
-        response_display = str(item["response"])
-        if len(response_display) > 50:
-            response_display = response_display[:47] + "..."
-        
-        history_data.append({
-            "Timestamp": item["timestamp"],
-            "Filename": item["filename"],
-            "Status": item["status"],
-            "Response": response_display
-        })
-    
-    # Create dataframe and display as a table
-    history_df = pd.DataFrame(history_data)
-    st.dataframe(history_df, use_container_width=True)
+    # Display each history item in a separate expander
+    for idx, item in enumerate(reversed(st.session_state.upload_history)):
+        with st.expander(f"{item['filename']} - {item['status']} ({item['timestamp']})"):
+            st.write(f"**Timestamp:** {item['timestamp']}")
+            st.write(f"**Filename:** {item['filename']}")
+            st.write(f"**Status:** {item['status']}")
+            st.write(f"**Response:** {item['response']}")
     
     # Add option to clear history
     if st.button("Clear Upload History"):
