@@ -20,9 +20,9 @@ HEADERS = {
 }
 
 # App title and description
-st.title("Invoice Upload Tool")
+st.title("Invoice Comparison Tool")
 st.markdown("""
-This application allows you to upload multiple invoice PDF files and submit them to the processing API.
+This application allows you to upload multiple invoice PDF files and compare them using the processing API.
 """)
 
 # Create a file uploader widget that accepts PDF files
@@ -32,8 +32,12 @@ uploaded_files = st.file_uploader("Upload Invoice PDF files", type=['pdf'], acce
 if 'upload_history' not in st.session_state:
     st.session_state.upload_history = []
 
+# Flag to track history clearing
+if 'clear_history' not in st.session_state:
+    st.session_state.clear_history = False
+
 # Process the uploaded files
-if uploaded_files and st.button("Submit Invoices"):
+if uploaded_files and st.button("Compare Invoice"):
     progress_bar = st.progress(0)
     status_text = st.empty()
     
@@ -133,8 +137,8 @@ if st.button("Send", key="send_button"):
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": assistant_response})
         
-        # Rerun the app to show the new messages
-        st.experimental_rerun()
+        # Use st.rerun() instead of experimental_rerun
+        st.rerun()
 
 # Display upload history
 if st.session_state.upload_history:
@@ -151,4 +155,5 @@ if st.session_state.upload_history:
     # Add option to clear history
     if st.button("Clear Upload History"):
         st.session_state.upload_history = []
-        st.experimental_rerun()
+        # Use st.rerun() instead of experimental_rerun
+        st.rerun()
