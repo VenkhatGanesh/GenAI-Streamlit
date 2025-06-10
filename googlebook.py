@@ -119,6 +119,10 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 if 'session_id' not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
+if 'show_api_test' not in st.session_state:
+    st.session_state.show_api_test = False
+if 'api_test_result' not in st.session_state:
+    st.session_state.api_test_result = None
 
 def call_books_api(user_message):
     """Call the Google Books API through the provided endpoint"""
@@ -178,13 +182,8 @@ def main():
         
         with col2:
             if st.button("🔍 Test API", key="test_api"):
-                with st.spinner("Testing..."):
-                    test_response = call_books_api("test connection")
-                    if "error" in test_response:
-                        st.error(f"❌ Connection Failed")
-                        st.caption(test_response['error'])
-                    else:
-                        st.success("✅ API Connection OK!")
+                st.session_state.show_api_test = True
+                st.rerun()
         
         st.markdown("---")
         st.markdown(f"**Session:** `{st.session_state.session_id[:8]}...`")
@@ -213,6 +212,33 @@ def main():
             - "What are the best cooking books?"
             - "Show me books by Stephen King"
             """)
+
+    # API Test Modal
+    if st.session_state.show_api_test:
+        @st.dialog("🔍 API Connection Test")
+        def test_api_modal():
+            st.write("Testing connection to Google Books API...")
+            
+            with st.spinner("Connecting..."):
+                test_response = call_books_api("test connection")
+                
+            if "error" in test_response:
+                st.error("❌ **Connection Failed**")
+                st.code(test_response['error'], language="text")
+                st.write("**Possible solutions:**")
+                st.write("• Check your internet connection")
+                st.write("• Try again in a few moments")
+                st.write("• Verify API endpoint accessibility")
+            else:
+                st.success("✅ **API Connection Successful!**")
+                st.write("The Google Books API is responding correctly.")
+                st.json({"status": "connected", "session_id": st.session_state.session_id[:8]})
+            
+            if st.button("Close", type="primary"):
+                st.session_state.show_api_test = False
+                st.rerun()
+        
+        test_api_modal()
 
     # Main chat interface
     with st.container():
