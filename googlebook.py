@@ -165,35 +165,54 @@ def main():
     st.markdown('<h1 class="title-text">📚 Book Discovery Chatbot</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle-text">Discover amazing books through conversation!</p>', unsafe_allow_html=True)
     
-    # Sidebar with information
+    # Sidebar with information - COMPLETELY REWRITTEN
     with st.sidebar:
-        st.markdown("### 📖 About This Chatbot")
-        st.markdown("""
-        This intelligent chatbot helps you discover books using natural conversation. 
-        You can ask about:
+        # Top buttons in two columns
+        col1, col2 = st.columns(2)
         
-        - 📚 Books by specific authors
-        - 🌸 Books on particular topics
-        - 📖 Book recommendations
-        - 📋 Detailed book information
-        - ⭐ Reviews and ratings
-        """)
+        with col1:
+            if st.button("🔄 New Chat", key="new_conv"):
+                st.session_state.messages = []
+                st.session_state.session_id = str(uuid.uuid4())
+                st.rerun()
         
-        st.markdown("### 💡 Example Queries")
-        st.markdown("""
-        - "Can you share details of books about flowers by Keyes?"
-        - "Find me science fiction novels"
-        - "What are the best cooking books?"
-        - "Show me books by Stephen King"
-        """)
+        with col2:
+            if st.button("🔍 Test API", key="test_api"):
+                with st.spinner("Testing..."):
+                    test_response = call_books_api("test connection")
+                    if "error" in test_response:
+                        st.error(f"❌ Connection Failed")
+                        st.caption(test_response['error'])
+                    else:
+                        st.success("✅ API Connection OK!")
         
         st.markdown("---")
-        st.markdown(f"**Session ID:** `{st.session_state.session_id[:8]}...`")
+        st.markdown(f"**Session:** `{st.session_state.session_id[:8]}...`")
+        st.markdown("---")
         
-        if st.button("🔄 New Conversation"):
-            st.session_state.messages = []
-            st.session_state.session_id = str(uuid.uuid4())
-            st.rerun()
+        # Collapsible About section
+        with st.expander("📖 About This Chatbot", expanded=False):
+            st.markdown("""
+            This intelligent chatbot helps you discover books using natural conversation. 
+            You can ask about:
+            
+            - 📚 Books by specific authors
+            - 🌸 Books on particular topics  
+            - 📖 Book recommendations
+            - 📋 Detailed book information
+            - ⭐ Reviews and ratings
+            """)
+        
+        # Collapsible Examples section
+        with st.expander("💡 Example Queries", expanded=False):
+            st.markdown("""
+            Try asking:
+            
+            - "Can you share details of books about flowers by Keyes?"
+            - "Find me science fiction novels"
+            - "What are the best cooking books?"
+            - "Show me books by Stephen King"
+            """)
 
     # Main chat interface
     with st.container():
