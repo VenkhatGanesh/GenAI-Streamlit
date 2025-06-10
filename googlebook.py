@@ -130,9 +130,16 @@ def call_books_api(user_message):
     }]
     
     try:
-        response = requests.post(API_URL, headers=HEADERS, json=payload, timeout=30)
+        # Try with a longer timeout and more detailed error handling
+        response = requests.post(API_URL, headers=HEADERS, json=payload, timeout=60)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.Timeout:
+        return {"error": "Connection timeout - The API is taking too long to respond. Please try again in a moment."}
+    except requests.exceptions.ConnectionError:
+        return {"error": "Connection failed - Unable to reach the API endpoint. Please check your internet connection."}
+    except requests.exceptions.HTTPError as e:
+        return {"error": f"HTTP Error {e.response.status_code}: {e.response.text}"}
     except requests.exceptions.RequestException as e:
         return {"error": f"API Error: {str(e)}"}
 
@@ -179,6 +186,26 @@ def main():
         - "What are the best cooking books?"
         - "Show me books by Stephen King"
         """)
+        
+        st.markdown("### 🔧 Troubleshooting")
+        st.markdown("""
+        If you're experiencing connection issues:
+        
+        - ✅ Check internet connection
+        - 🔄 Try refreshing the page
+        - ⏱️ Wait a moment and retry
+        - 🌐 Verify API endpoint accessibility
+        - 🔑 Confirm authorization token is valid
+        """)
+        
+        # Add API status check
+        if st.button("🔍 Test API Connection"):
+            with st.spinner("Testing connection..."):
+                test_response = call_books_api("test connection")
+                if "error" in test_response:
+                    st.error(f"❌ Connection failed: {test_response['error']}")
+                else:
+                    st.success("✅ API connection successful!")
         
         st.markdown("---")
         st.markdown(f"**Session ID:** `{st.session_state.session_id[:8]}...`")
@@ -242,7 +269,18 @@ def main():
             api_response = call_books_api(user_input)
             
             if "error" in api_response:
-                assistant_response = f"I apologize, but I encountered an error while searching for books: {api_response['error']}"
+                assistant_response = f"""
+                I apologize, but I encountered an issue while searching for books: 
+                
+                **{api_response['error']}**
+                
+                🔧 **Troubleshooting Tips:**
+                - Check if your internet connection is stable
+                - Try again in a few moments - the API might be temporarily busy
+                - Verify that the API endpoint is accessible from your network
+                
+                In the meantime, I can suggest some general book recommendations based on your query about "{user_input}". Would you like me to provide some general suggestions?
+                """
             else:
                 assistant_response = api_response.get("response", "I found some information, but couldn't format it properly.")
             
