@@ -123,6 +123,8 @@ if 'show_api_test' not in st.session_state:
     st.session_state.show_api_test = False
 if 'api_test_result' not in st.session_state:
     st.session_state.api_test_result = None
+if 'is_searching' not in st.session_state:
+    st.session_state.is_searching = False
 
 def call_books_api(user_message):
     """Call the Google Books API through the provided endpoint"""
@@ -175,14 +177,15 @@ def main():
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("🔄 New Chat", key="new_conv"):
+            if st.button("🔄 New Chat", key="new_conv", disabled=st.session_state.is_searching):
                 st.session_state.messages = []
                 st.session_state.session_id = str(uuid.uuid4())
                 st.session_state.show_api_test = False  # Reset API test state
+                st.session_state.is_searching = False  # Reset searching state
                 st.rerun()
         
         with col2:
-            if st.button("🔍 Test API", key="test_api"):
+            if st.button("🔍 Test API", key="test_api", disabled=st.session_state.is_searching):
                 st.session_state.show_api_test = True
                 st.rerun()
         
@@ -220,24 +223,35 @@ def main():
         def test_api_modal():
             st.write("Testing connection to Google Books API...")
             
-            with st.spinner("Connecting..."):
-                test_response = call_books_api("test connection")
-                
-            if "error" in test_response:
-                st.error("❌ **Connection Failed**")
-                st.code(test_response['error'], language="text")
-                st.write("**Possible solutions:**")
-                st.write("• Check your internet connection")
-                st.write("• Try again in a few moments")
-                st.write("• Verify API endpoint accessibility")
-            else:
-                st.success("✅ **API Connection Successful!**")
-                st.write("The Google Books API is responding correctly.")
-                st.json({"status": "connected", "session_id": st.session_state.session_id[:8]})
+            if 'api_test_completed' not in st.session_state:
+                st.session_state.api_test_completed = False
             
-            if st.button("Close", type="primary"):
-                st.session_state.show_api_test = False
-                st.rerun()
+            if not st.session_state.api_test_completed:
+                with st.spinner("Connecting..."):
+                    test_response = call_books_api("test connection")
+                    st.session_state.api_test_result = test_response
+                    st.session_state.api_test_completed = True
+                    st.rerun()
+            else:
+                test_response = st.session_state.api_test_result
+                
+                if "error" in test_response:
+                    st.error("❌ **Connection Failed**")
+                    st.code(test_response['error'], language="text")
+                    st.write("**Possible solutions:**")
+                    st.write("• Check your internet connection")
+                    st.write("• Try again in a few moments")
+                    st.write("• Verify API endpoint accessibility")
+                else:
+                    st.success("✅ **API Connection Successful!**")
+                    st.write("The Google Books API is responding correctly.")
+                    st.json({"status": "connected", "session_id": st.session_state.session_id[:8]})
+                
+                if st.button("Close", type="primary"):
+                    st.session_state.show_api_test = False
+                    st.session_state.api_test_completed = False
+                    st.session_state.api_test_result = None
+                    st.rerun()
         
         test_api_modal()
 
