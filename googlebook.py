@@ -187,26 +187,6 @@ def main():
         - "Show me books by Stephen King"
         """)
         
-        st.markdown("### 🔧 Troubleshooting")
-        st.markdown("""
-        If you're experiencing connection issues:
-        
-        - ✅ Check internet connection
-        - 🔄 Try refreshing the page
-        - ⏱️ Wait a moment and retry
-        - 🌐 Verify API endpoint accessibility
-        - 🔑 Confirm authorization token is valid
-        """)
-        
-        # Add API status check
-        if st.button("🔍 Test API Connection"):
-            with st.spinner("Testing connection..."):
-                test_response = call_books_api("test connection")
-                if "error" in test_response:
-                    st.error(f"❌ Connection failed: {test_response['error']}")
-                else:
-                    st.success("✅ API connection successful!")
-        
         st.markdown("---")
         st.markdown(f"**Session ID:** `{st.session_state.session_id[:8]}...`")
         
