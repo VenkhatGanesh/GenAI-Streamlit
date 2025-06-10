@@ -1,0 +1,268 @@
+import streamlit as st
+import requests
+import json
+import uuid
+from datetime import datetime
+import time
+
+# Page configuration
+st.set_page_config(
+    page_title="📚 Book Discovery Chatbot",
+    page_icon="📖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for multi-color background and styling
+st.markdown("""
+<style>
+    .main {
+        background: linear-gradient(135deg, 
+            #667eea 0%, 
+            #764ba2 25%, 
+            #f093fb 50%, 
+            #f5576c 75%, 
+            #4facfe 100%);
+        background-size: 400% 400%;
+        animation: gradientShift 10s ease infinite;
+    }
+    
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    
+    .chat-container {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 20px;
+        margin: 10px 0;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .user-message {
+        background: rgba(100, 149, 237, 0.3);
+        padding: 15px;
+        border-radius: 15px;
+        margin: 10px 0;
+        border-left: 4px solid #6495ED;
+    }
+    
+    .assistant-message {
+        background: rgba(144, 238, 144, 0.3);
+        padding: 15px;
+        border-radius: 15px;
+        margin: 10px 0;
+        border-left: 4px solid #90EE90;
+    }
+    
+    .book-card {
+        background: rgba(255, 255, 255, 0.9);
+        padding: 20px;
+        border-radius: 15px;
+        margin: 15px 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .stTextInput > div > div > input {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 10px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    .stButton > button {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 10px 20px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .title-text {
+        color: white;
+        text-align: center;
+        font-size: 3rem;
+        font-weight: bold;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        margin-bottom: 20px;
+    }
+    
+    .subtitle-text {
+        color: white;
+        text-align: center;
+        font-size: 1.5rem;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        margin-bottom: 30px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# API Configuration
+API_URL = "https://emea.snaplogic.com/api/1/rest/slsched/feed/ConnectFasterInc/snapLogic4snapLogic/Training20250407/GoogleBooks_agent_driver_api"
+HEADERS = {
+    "Authorization": "Bearer OuOBD5JnFNduAJeBV7F2GQgdfQKbBJcM",
+    "Content-Type": "application/json"
+}
+
+# Initialize session state
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+if 'session_id' not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
+def call_books_api(user_message):
+    """Call the Google Books API through the provided endpoint"""
+    payload = [{
+        "session_id": st.session_state.session_id,
+        "messages": st.session_state.messages + [
+            {"content": user_message, "sl_role": "USER"}
+        ]
+    }]
+    
+    try:
+        response = requests.post(API_URL, headers=HEADERS, json=payload, timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        return {"error": f"API Error: {str(e)}"}
+
+def display_message(message, is_user=True):
+    """Display a chat message with appropriate styling"""
+    if is_user:
+        st.markdown(f"""
+        <div class="user-message">
+            <strong>🧑‍💻 You:</strong><br>
+            {message}
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="assistant-message">
+            <strong>🤖 Book Assistant:</strong><br>
+            {message}
+        </div>
+        """, unsafe_allow_html=True)
+
+def main():
+    # Title and header
+    st.markdown('<h1 class="title-text">📚 Book Discovery Chatbot</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle-text">Discover amazing books through conversation!</p>', unsafe_allow_html=True)
+    
+    # Sidebar with information
+    with st.sidebar:
+        st.markdown("### 📖 About This Chatbot")
+        st.markdown("""
+        This intelligent chatbot helps you discover books using natural conversation. 
+        You can ask about:
+        
+        - 📚 Books by specific authors
+        - 🌸 Books on particular topics
+        - 📖 Book recommendations
+        - 📋 Detailed book information
+        - ⭐ Reviews and ratings
+        """)
+        
+        st.markdown("### 💡 Example Queries")
+        st.markdown("""
+        - "Can you share details of books about flowers by Keyes?"
+        - "Find me science fiction novels"
+        - "What are the best cooking books?"
+        - "Show me books by Stephen King"
+        """)
+        
+        st.markdown("---")
+        st.markdown(f"**Session ID:** `{st.session_state.session_id[:8]}...`")
+        
+        if st.button("🔄 New Conversation"):
+            st.session_state.messages = []
+            st.session_state.session_id = str(uuid.uuid4())
+            st.rerun()
+
+    # Main chat interface
+    with st.container():
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        
+        # Display chat history
+        if st.session_state.messages:
+            st.markdown("### 💬 Conversation History")
+            for message in st.session_state.messages:
+                if message['sl_role'] == 'USER':
+                    display_message(message['content'], is_user=True)
+                else:
+                    display_message(message['content'], is_user=False)
+        else:
+            st.markdown("""
+            <div class="book-card">
+                <h3>👋 Welcome to your Book Discovery Assistant!</h3>
+                <p>I'm here to help you find amazing books. Just ask me about any book, author, or topic you're interested in!</p>
+                <p><strong>Try asking:</strong> "Can you recommend some mystery novels?" or "Tell me about books by Agatha Christie"</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Chat input
+    with st.container():
+        st.markdown("### 💭 Ask me about books...")
+        
+        # Create columns for input and button
+        col1, col2 = st.columns([4, 1])
+        
+        with col1:
+            user_input = st.text_input(
+                "Your message:",
+                placeholder="e.g., Can you tell me about books on artificial intelligence?",
+                key="user_input"
+            )
+        
+        with col2:
+            send_button = st.button("📤 Send", type="primary")
+
+    # Handle user input
+    if send_button and user_input:
+        # Add user message to session state
+        st.session_state.messages.append({
+            "content": user_input,
+            "sl_role": "USER"
+        })
+        
+        # Show thinking message
+        with st.spinner("🔍 Searching for books..."):
+            # Call the API
+            api_response = call_books_api(user_input)
+            
+            if "error" in api_response:
+                assistant_response = f"I apologize, but I encountered an error while searching for books: {api_response['error']}"
+            else:
+                assistant_response = api_response.get("response", "I found some information, but couldn't format it properly.")
+            
+            # Add assistant response to session state
+            st.session_state.messages.append({
+                "content": assistant_response,
+                "sl_role": "ASSISTANT"
+            })
+        
+        # Rerun to update the display
+        st.rerun()
+
+    # Footer
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; color: white; font-size: 0.9rem;">
+        <p>📚 Powered by Google Books API | Built with Streamlit</p>
+        <p>Happy Reading! 🌟</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    main()
