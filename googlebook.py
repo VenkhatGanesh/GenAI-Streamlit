@@ -131,7 +131,7 @@ def call_books_api(user_message):
     
     try:
         # Try with a longer timeout and more detailed error handling
-        response = requests.post(API_URL, headers=HEADERS, json=payload, timeout=180)
+        response = requests.post(API_URL, headers=HEADERS, json=payload, timeout=60)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.Timeout:
