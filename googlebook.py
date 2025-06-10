@@ -169,7 +169,7 @@ def main():
     st.markdown('<h1 class="title-text">📚 Book Discovery Chatbot</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle-text">Discover amazing books through conversation!</p>', unsafe_allow_html=True)
     
-    # Sidebar with information - COMPLETELY REWRITTEN
+    # Sidebar with information
     with st.sidebar:
         # Top buttons in two columns
         col1, col2 = st.columns(2)
@@ -178,6 +178,7 @@ def main():
             if st.button("🔄 New Chat", key="new_conv"):
                 st.session_state.messages = []
                 st.session_state.session_id = str(uuid.uuid4())
+                st.session_state.show_api_test = False  # Reset API test state
                 st.rerun()
         
         with col2:
@@ -282,6 +283,9 @@ def main():
 
     # Handle user input
     if send_button and user_input:
+        # IMPORTANT FIX: Reset the API test modal state when sending a message
+        st.session_state.show_api_test = False
+        
         # Add user message to session state
         st.session_state.messages.append({
             "content": user_input,
