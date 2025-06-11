@@ -219,20 +219,27 @@ def main():
 
     # API Test Modal
     if st.session_state.show_api_test:
-        @st.dialog("🔍 API Connection Test")
+        @st.dialog("🔍 API Connection Test", width="large")
         def test_api_modal():
-            st.write("Testing connection to Google Books API...")
-            
+            # Prevent modal from closing by clicking outside during test
+            if 'api_test_started' not in st.session_state:
+                st.session_state.api_test_started = False
             if 'api_test_completed' not in st.session_state:
                 st.session_state.api_test_completed = False
             
-            if not st.session_state.api_test_completed:
+            st.write("Testing connection to Google Books API...")
+            
+            # Start the test automatically when modal opens
+            if not st.session_state.api_test_started:
+                st.session_state.api_test_started = True
                 with st.spinner("Connecting..."):
                     test_response = call_books_api("test connection")
                     st.session_state.api_test_result = test_response
                     st.session_state.api_test_completed = True
-                    st.rerun()
-            else:
+                st.rerun()
+            
+            # Show results if test is completed
+            if st.session_state.api_test_completed:
                 test_response = st.session_state.api_test_result
                 
                 if "error" in test_response:
@@ -247,11 +254,16 @@ def main():
                     st.write("The Google Books API is responding correctly.")
                     st.json({"status": "connected", "session_id": st.session_state.session_id[:8]})
                 
-                if st.button("Close", type="primary"):
+                # Only show close button after test is completed
+                if st.button("Close", type="primary", use_container_width=True):
                     st.session_state.show_api_test = False
+                    st.session_state.api_test_started = False
                     st.session_state.api_test_completed = False
                     st.session_state.api_test_result = None
                     st.rerun()
+            else:
+                # Show connecting status
+                st.info("🔄 Connecting to API... Please wait.")
         
         test_api_modal()
 
@@ -293,12 +305,17 @@ def main():
             )
         
         with col2:
-            send_button = st.button("📤 Send", type="primary")
+            send_button = st.button("📤 Send", type="primary", disabled=st.session_state.is_searching)
 
     # Handle user input
-    if send_button and user_input:
-        # IMPORTANT FIX: Reset the API test modal state when sending a message
+    if send_button and user_input and not st.session_state.is_searching:
+        # Set searching state immediately to disable buttons
+        st.session_state.is_searching = True
+        
+        # Reset the API test modal state when sending a message
         st.session_state.show_api_test = False
+        st.session_state.api_test_started = False
+        st.session_state.api_test_completed = False
         
         # Add user message to session state
         st.session_state.messages.append({
@@ -306,32 +323,37 @@ def main():
             "sl_role": "USER"
         })
         
-        # Show thinking message
-        with st.spinner("🔍 Searching for books..."):
-            # Call the API
-            api_response = call_books_api(user_input)
-            
-            if "error" in api_response:
-                assistant_response = f"""
-                I apologize, but I encountered an issue while searching for books: 
+        try:
+            # Show thinking message
+            with st.spinner("🔍 Searching for books..."):
+                # Call the API
+                api_response = call_books_api(user_input)
                 
-                **{api_response['error']}**
+                if "error" in api_response:
+                    assistant_response = f"""
+                    I apologize, but I encountered an issue while searching for books: 
+                    
+                    **{api_response['error']}**
+                    
+                    🔧 **Troubleshooting Tips:**
+                    - Check if your internet connection is stable
+                    - Try again in a few moments - the API might be temporarily busy
+                    - Verify that the API endpoint is accessible from your network
+                    
+                    In the meantime, I can suggest some general book recommendations based on your query about "{user_input}". Would you like me to provide some general suggestions?
+                    """
+                else:
+                    assistant_response = api_response.get("response", "I found some information, but couldn't format it properly.")
                 
-                🔧 **Troubleshooting Tips:**
-                - Check if your internet connection is stable
-                - Try again in a few moments - the API might be temporarily busy
-                - Verify that the API endpoint is accessible from your network
-                
-                In the meantime, I can suggest some general book recommendations based on your query about "{user_input}". Would you like me to provide some general suggestions?
-                """
-            else:
-                assistant_response = api_response.get("response", "I found some information, but couldn't format it properly.")
-            
-            # Add assistant response to session state
-            st.session_state.messages.append({
-                "content": assistant_response,
-                "sl_role": "ASSISTANT"
-            })
+                # Add assistant response to session state
+                st.session_state.messages.append({
+                    "content": assistant_response,
+                    "sl_role": "ASSISTANT"
+                })
+        
+        finally:
+            # Always reset searching state, even if there's an error
+            st.session_state.is_searching = False
         
         # Rerun to update the display
         st.rerun()
