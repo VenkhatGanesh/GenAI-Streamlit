@@ -309,13 +309,9 @@ def main():
 
     # Handle user input
     if send_button and user_input and not st.session_state.is_searching:
-        # Set searching state immediately to disable buttons
-        st.session_state.is_searching = True
-        
-        # Reset the API test modal state when sending a message
+        # IMPORTANT FIX: Reset the API test modal state when sending a message
         st.session_state.show_api_test = False
-        st.session_state.api_test_started = False
-        st.session_state.api_test_completed = False
+        st.session_state.is_searching = True  # Set searching state
         
         # Add user message to session state
         st.session_state.messages.append({
@@ -323,37 +319,35 @@ def main():
             "sl_role": "USER"
         })
         
-        try:
-            # Show thinking message
-            with st.spinner("🔍 Searching for books..."):
-                # Call the API
-                api_response = call_books_api(user_input)
+        # Show thinking message
+        with st.spinner("🔍 Searching for books..."):
+            # Call the API
+            api_response = call_books_api(user_input)
+            
+            if "error" in api_response:
+                assistant_response = f"""
+                I apologize, but I encountered an issue while searching for books: 
                 
-                if "error" in api_response:
-                    assistant_response = f"""
-                    I apologize, but I encountered an issue while searching for books: 
-                    
-                    **{api_response['error']}**
-                    
-                    🔧 **Troubleshooting Tips:**
-                    - Check if your internet connection is stable
-                    - Try again in a few moments - the API might be temporarily busy
-                    - Verify that the API endpoint is accessible from your network
-                    
-                    In the meantime, I can suggest some general book recommendations based on your query about "{user_input}". Would you like me to provide some general suggestions?
-                    """
-                else:
-                    assistant_response = api_response.get("response", "I found some information, but couldn't format it properly.")
+                **{api_response['error']}**
                 
-                # Add assistant response to session state
-                st.session_state.messages.append({
-                    "content": assistant_response,
-                    "sl_role": "ASSISTANT"
-                })
+                🔧 **Troubleshooting Tips:**
+                - Check if your internet connection is stable
+                - Try again in a few moments - the API might be temporarily busy
+                - Verify that the API endpoint is accessible from your network
+                
+                In the meantime, I can suggest some general book recommendations based on your query about "{user_input}". Would you like me to provide some general suggestions?
+                """
+            else:
+                assistant_response = api_response.get("response", "I found some information, but couldn't format it properly.")
+            
+            # Add assistant response to session state
+            st.session_state.messages.append({
+                "content": assistant_response,
+                "sl_role": "ASSISTANT"
+            })
         
-        finally:
-            # Always reset searching state, even if there's an error
-            st.session_state.is_searching = False
+        # Reset searching state
+        st.session_state.is_searching = False
         
         # Rerun to update the display
         st.rerun()
